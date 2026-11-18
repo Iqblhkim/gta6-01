@@ -1,69 +1,110 @@
-// Keyboard and mouse input for Solano City. Held keys give movement
-// and driving; single presses are edges the main loop consumes once.
-
+// Kota Seja — keyboard and mouse input.
+// One object holds the whole control state; the world update reads it
+// every frame. Pointer lock gives the mouse-look its deltas, and the
+// canvas click re-locks when the browser drops it.
 export function createInput(canvas) {
-  const held = new Set();
-  const pressed = new Set();
-  const mouse = { x: 0, y: 0, down: false, clicked: false };
+  const keys = new Set();
+  const input = {
+    forward: false, back: false, left: false, right: false,
+    run: false, jump: false, interact: false, enterCar: false,
+    shoot: false, shootPulse: false, aim: false, reload: false, weaponSlot: 0,
+    lookDX: 0, lookDY: 0,
+    mouseX: 0, mouseY: 0,
+    locked: false,
+  };
+  let jumpQueued = false;
+  let interactQueued = false;
+  let enterQueued = false;
+  let reloadQueued = false;
 
-  function onKeyDown(e) {
+  function refresh() {
+    input.forward = keys.has('KeyW') || keys.has('ArrowUp');
+    input.back = keys.has('KeyS') || keys.has('ArrowDown');
+    input.left = keys.has('KeyA') || keys.has('ArrowLeft');
+    input.right = keys.has('KeyD') || keys.has('ArrowRight');
+    input.run = keys.has('ShiftLeft') || keys.has('ShiftRight');
+    // One-shot actions are sticky until the game loop consumes them:
+    // a fast key press (down + up between two frames) must not be lost.
+    input.jump = input.jump || jumpQueued;
+    input.interact = input.interact || interactQueued;
+    input.enterCar = input.enterCar || enterQueued;
+    input.reload = input.reload || reloadQueued;
+    jumpQueued = false;
+    interactQueued = false;
+    enterQueued = false;
+    reloadQueued = false;
+  }
+
+  const KEY_ACTIONS = {
+    KeyE: () => { interactQueued = true; },
+    KeyF: () => { enterQueued = true; },
+    KeyR: () => { reloadQueued = true; },
+    Space: () => { jumpQueued = true; },
+  };
+
+  window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
-    held.add(e.code);
-    pressed.add(e.code);
-    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
-      e.preventDefault();
+    keys.add(e.code);
+    if (e.code === 'Space') e.preventDefault();
+    const action = KEY_ACTIONS[e.code];
+    if (action) action();
+    if (e.code.startsWith('Digit')) {
+      const n = Number(e.code.slice(5));
+      if (n >= 1 && n <= 4) input.weaponSlot = n;
     }
-  }
-  function onKeyUp(e) {
-    held.delete(e.code);
-  }
-  function onMouseMove(e) {
-    const rect = canvas.getBoundingClientRect();
-    mouse.x = ((e.clientX - rect.left) / rect.width) * canvas.width;
-    mouse.y = ((e.clientY - rect.top) / rect.height) * canvas.height;
-  }
-  function onMouseDown(e) {
-    onMouseMove(e);
-    mouse.down = true;
-    mouse.clicked = true;
-  }
-  function onMouseUp() {
-    mouse.down = false;
-  }
+    refresh();
+  });
+  window.addEventListener('keyup', (e) => {
+    keys.delete(e.code);
+    refresh();
+  });
+  window.addEventListener('blur', () => {
+    keys.clear();
+    refresh();
+  });
 
-  window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('keyup', onKeyUp);
-  canvas.addEventListener('mousemove', onMouseMove);
-  canvas.addEventListener('mousedown', onMouseDown);
-  window.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('mousedown', (e) => {
+    // shootPulse is sticky until the game loop consumes it: a click that
+    // lands between two slow frames must still fire one shot.
+    if (e.button === 0) { input.shoot = true; input.shootPulse = true; }
+    if (e.button === 2) input.aim = true;
+    if (!input.locked) canvas.requestPointerLock?.();
+  });
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 0) input.shoot = false;
+    if (e.button === 2) input.aim = false;
+  });
+  window.addEventListener('mousemove', (e) => {
+    input.mouseX = e.clientX;
+    input.mouseY = e.clientY;
+    if (document.pointerLockElement === canvas) {
+      input.lookDX += e.movementX || 0;
+      input.lookDY += e.movementY || 0;
+    }
+  });
+  document.addEventListener('pointerlockchange', () => {
+    input.locked = document.pointerLockElement === canvas;
+  });
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+  // The world consumes the accumulated look deltas once per frame.
+  input.consumeLook = () => {
+    const dx = input.lookDX, dy = input.lookDY;
+    input.lookDX = 0;
+    input.lookDY = 0;
+    return { dx, dy };
+  };
+  input.refresh = refresh;
+  return input;
+}
+
+// A blank input object for headless tests and for the title screen,
+// where no keys are held.
+export function blankInput() {
   return {
-    mouse,
-    // The movement snapshot the world steps on.
-    move() {
-      return {
-        up: held.has('KeyW') || held.has('ArrowUp'),
-        down: held.has('KeyS') || held.has('ArrowDown'),
-        left: held.has('KeyA') || held.has('ArrowLeft'),
-        right: held.has('KeyD') || held.has('ArrowRight'),
-        run: held.has('ShiftLeft') || held.has('ShiftRight'),
-      };
-    },
-    // True once for the frame the key went down.
-    take(code) {
-      if (!pressed.has(code)) return false;
-      pressed.delete(code);
-      return true;
-    },
-    takeClick() {
-      if (!mouse.clicked) return false;
-      mouse.clicked = false;
-      return true;
-    },
-    // Drop edges that were never consumed, once a frame.
-    endFrame() {
-      pressed.clear();
-      mouse.clicked = false;
-    },
+    forward: false, back: false, left: false, right: false,
+    run: false, jump: false, interact: false, enterCar: false,
+    shoot: false, shootPulse: false, aim: false, reload: false, weaponSlot: 0,
+    lookDX: 0, lookDY: 0, locked: false,
   };
 }
