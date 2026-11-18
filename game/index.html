@@ -1,17 +1,205 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SOLANO CITY — an open-world crime game</title>
+<title>Kota Seja — Open-World Crime</title>
 <style>
-  html, body { margin: 0; padding: 0; background: #0e0e12; height: 100%; }
-  body { display: flex; align-items: center; justify-content: center; }
-  canvas { width: min(100vw, 177.78vh); height: min(100vh, 56.25vw); display: block; background: #1a1d22; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a0f2e;
+    font-family: "Trebuchet MS", Verdana, sans-serif; color: #fff; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  .hidden { display: none !important; }
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  .panel { background: rgba(20, 10, 40, 0.55); border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 10px; padding: 8px 12px; backdrop-filter: blur(2px); }
+  #hud-top { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    text-align: center; min-width: 420px; }
+  #hud-mission { font-weight: bold; font-size: 15px; letter-spacing: 0.5px; color: #ffd23d; }
+  #hud-stage { font-size: 12px; color: #fff; opacity: 0.9; margin-top: 2px; }
+  #hud-right { position: absolute; top: 12px; right: 12px; text-align: right; }
+  #hud-clock { font-size: 14px; font-weight: bold; }
+  #hud-money { font-size: 22px; font-weight: bold; color: #7dff9a; }
+  #hud-debt { font-size: 11px; color: #ffb3c0; }
+  #hud-stars { font-size: 22px; letter-spacing: 3px; }
+  #hud-bars { position: absolute; left: 12px; top: 12px; width: 210px; }
+  .bar-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: 11px; font-weight: bold; }
+  .bar-row span { width: 52px; }
+  .bar { flex: 1; height: 10px; background: rgba(0,0,0,0.55); border-radius: 5px; overflow: hidden; }
+  .bar > div { height: 100%; }
+  #bar-health { background: #37d67a; width: 100%; }
+  #bar-armour { background: #3fa7d6; width: 0%; }
+  #bar-respect { background: #ff9f1c; width: 0%; }
+  #hud-district { font-size: 12px; color: #ffd23d; margin-top: 4px; letter-spacing: 1px; }
+  #hud-speed { font-size: 13px; margin-top: 2px; }
+  #minimap-wrap { position: absolute; left: 12px; bottom: 12px; }
+  #minimap { border-radius: 50%; border: 3px solid rgba(255,255,255,0.8);
+    background: #2c4a2e; box-shadow: 0 0 12px rgba(0,0,0,0.5); }
+  #hud-weapons { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .slot { background: rgba(20,10,40,0.55); border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: bold; text-align: right; }
+  .slot.active { border-color: #ffd23d; color: #ffd23d; }
+  .slot.locked { opacity: 0.45; }
+  #hud-msg { position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%);
+    font-size: 16px; font-weight: bold; color: #ffd23d; text-shadow: 0 2px 4px #000; text-align: center; }
+  #hud-radio { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; font-style: italic; color: #cfe8ff; text-shadow: 0 2px 4px #000; text-align: center; }
+  #hud-help { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: rgba(255,255,255,0.75); text-shadow: 0 1px 3px #000; white-space: nowrap; }
+  #btn-mute { position: absolute; right: 12px; top: 132px; pointer-events: auto; cursor: pointer;
+    background: rgba(20,10,40,0.55); color: #fff; border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: bold; }
+  /* ---------- Screens ---------- */
+  .screen { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center;
+    justify-content: center; background: linear-gradient(180deg, rgba(26,15,46,0.55), rgba(60,15,60,0.75)); }
+  .card { text-align: center; max-width: 620px; padding: 36px 44px;
+    background: rgba(20,8,38,0.82); border: 2px solid #ff7b2d; border-radius: 16px;
+    box-shadow: 0 0 60px rgba(255,123,45,0.35); }
+  .card h1 { font-size: 54px; letter-spacing: 4px; color: #ff9f1c;
+    text-shadow: 0 0 24px #ff5a2d, 0 3px 0 #7a1e00; }
+  .card h2 { font-size: 26px; letter-spacing: 2px; color: #ffd23d; margin-bottom: 10px; }
+  .card p { font-size: 15px; line-height: 1.55; color: #f2e8ff; margin: 10px 0; }
+  .card .sub { font-size: 13px; color: #c9b8e8; }
+  .card button { display: block; width: 280px; margin: 10px auto; padding: 12px;
+    font-size: 16px; font-weight: bold; letter-spacing: 1px; cursor: pointer;
+    color: #fff; background: linear-gradient(180deg, #ff7b2d, #e84a5f);
+    border: 1px solid #ffd23d; border-radius: 8px; }
+  .card button:hover { filter: brightness(1.15); }
+  .card button.ghost { background: transparent; border-color: #fff; }
+  .controls-table { text-align: left; margin: 12px auto; font-size: 14px; line-height: 1.9; }
+  .controls-table b { color: #ffd23d; display: inline-block; width: 130px; }
+  #fullmap { border: 2px solid #ffd23d; border-radius: 8px; background: #2c4a2e; cursor: crosshair; }
 </style>
 </head>
 <body>
-<canvas id="game" width="1280" height="720"></canvas>
+<canvas id="game" width="960" height="600"></canvas>
+
+<!-- ======================= HUD ======================= -->
+<div id="hud" class="hidden">
+  <div id="hud-top" class="panel">
+    <div id="hud-mission">MISSION 1/8 · FRESH AIR</div>
+    <div id="hud-stage">STAGE 1/2 · NEXT ▸ Hideout</div>
+  </div>
+  <div id="hud-right" class="panel">
+    <div id="hud-clock">DAY 1 · 17:40</div>
+    <div id="hud-money">$250</div>
+    <div id="hud-debt">DEBT $50,000</div>
+    <div id="hud-stars">☆☆☆☆☆</div>
+  </div>
+  <div id="hud-bars" class="panel">
+    <div class="bar-row"><span>HEALTH <b id="hud-health-num">100</b></span><div class="bar"><div id="bar-health"></div></div></div>
+    <div class="bar-row"><span>ARMOUR</span><div class="bar"><div id="bar-armour"></div></div></div>
+    <div class="bar-row"><span>RESPECT</span><div class="bar"><div id="bar-respect"></div></div></div>
+    <div id="hud-district">DOWNTOWN</div>
+    <div id="hud-speed">0 km/h</div>
+    <div id="hud-weapon" style="color:#ffd23d">PISTOL 12/48</div>
+  </div>
+  <div id="minimap-wrap"><canvas id="minimap" width="180" height="180"></canvas></div>
+  <div id="hud-weapons">
+    <div class="slot" id="slot-fists">1 FISTS</div>
+    <div class="slot" id="slot-pistol">2 PISTOL</div>
+    <div class="slot" id="slot-smg">3 SMG</div>
+    <div class="slot" id="slot-shotgun">4 SHOTGUN</div>
+  </div>
+  <button id="btn-mute">SOUND: ON</button>
+  <div id="hud-msg"></div>
+  <div id="hud-radio"></div>
+  <div id="hud-help">WASD move · SHIFT run · SPACE jump · F enter/exit car · E interact · LMB shoot · RMB aim · 1-4 weapons · R reload · M map · ESC pause</div>
+</div>
+
+<!-- ======================= TITLE ======================= -->
+<div class="screen" id="screen-title">
+  <div class="card">
+    <h1>KOTA SEJA</h1>
+    <p class="sub">An open-world crime story · a sun-soaked island city · sunset, 17:40</p>
+    <p>Rico Vega owes <b style="color:#ff9f1c">$50,000</b> to the wrong people.
+    One island, four districts, eight jobs — steal cars, outrun the police,
+    and take back the city before the debt takes you.</p>
+    <button id="btn-new">NEW GAME</button>
+    <button id="btn-continue">CONTINUE</button>
+    <button id="btn-controls" class="ghost">CONTROLS</button>
+    <p class="sub">Best on desktop Chrome · keyboard + mouse · sound on for the full sunset vibe</p>
+  </div>
+</div>
+
+<!-- ======================= CONTROLS ======================= -->
+<div class="screen hidden" id="screen-controls">
+  <div class="card">
+    <h2>CONTROLS</h2>
+    <div class="controls-table">
+      <div><b>W A S D</b> Walk / drive</div>
+      <div><b>Mouse</b> Look around (click to lock)</div>
+      <div><b>SHIFT</b> Run</div>
+      <div><b>SPACE</b> Jump / handbrake in a car</div>
+      <div><b>F</b> Enter / exit car</div>
+      <div><b>E</b> Interact / start mission at the hideout</div>
+      <div><b>Left click</b> Shoot &nbsp; <b>Right click</b> Aim</div>
+      <div><b>1 – 4</b> Weapons &nbsp; <b>R</b> Reload</div>
+      <div><b>M</b> Full map (click to set a waypoint)</div>
+      <div><b>ESC</b> Pause</div>
+    </div>
+    <button id="btn-controls-back">BACK</button>
+  </div>
+</div>
+
+<!-- ======================= PAUSE ======================= -->
+<div class="screen hidden" id="screen-pause">
+  <div class="card">
+    <h2>PAUSED</h2>
+    <p>Kota Seja waits for no one — except right now.</p>
+    <button id="btn-resume">RESUME</button>
+    <button id="btn-quit" class="ghost">SAVE &amp; QUIT TO TITLE</button>
+  </div>
+</div>
+
+<!-- ======================= MAP ======================= -->
+<div class="screen hidden" id="screen-map">
+  <div class="card">
+    <h2>MAP OF KOTA SEJA</h2>
+    <p class="sub">Click anywhere to set a waypoint. Gold = mission target, pink = hideout.</p>
+    <canvas id="fullmap" width="520" height="520"></canvas>
+    <button id="btn-map-close">CLOSE (M)</button>
+  </div>
+</div>
+
+<!-- ======================= MISSION COMPLETE ======================= -->
+<div class="screen hidden" id="screen-mission">
+  <div class="card">
+    <h2>MISSION COMPLETE</h2>
+    <p id="mission-complete-text">Clean work, Rico. The city is watching.</p>
+    <button id="btn-mission">CONTINUE</button>
+  </div>
+</div>
+
+<!-- ======================= BUSTED ======================= -->
+<div class="screen hidden" id="screen-busted">
+  <div class="card">
+    <h2 style="color:#7fb8d9">BUSTED</h2>
+    <p>The police caught up with you. Fine paid, heat cleared — but the debt is still there.</p>
+    <button id="btn-busted">RESPAWN</button>
+  </div>
+</div>
+
+<!-- ======================= WASTED ======================= -->
+<div class="screen hidden" id="screen-wasted">
+  <div class="card">
+    <h2 style="color:#e84a5f">WASTED</h2>
+    <p>Rico went down in the streets of Kota Seja. The city patched him up — for a price.</p>
+    <button id="btn-wasted">RESPAWN</button>
+  </div>
+</div>
+
+<!-- ======================= STORY COMPLETE ======================= -->
+<div class="screen hidden" id="screen-complete">
+  <div class="card">
+    <h2>KING OF SOLANO</h2>
+    <p>Eight jobs. One island. The debt is paid, the hideout is yours, and the
+    sunset over Kota Seja has never looked better. Thanks for playing, Rico.</p>
+    <button id="btn-complete">KEEP EXPLORING</button>
+  </div>
+</div>
+
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>
