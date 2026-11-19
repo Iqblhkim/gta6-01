@@ -2,13 +2,26 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Kota Seja — Open-World Crime</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #1a0f2e;
-    font-family: "Trebuchet MS", Verdana, sans-serif; color: #fff; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+    font-family: "Trebuchet MS", Verdana, sans-serif; color: #fff;
+    overscroll-behavior: none; }
+  /* Round 5 (2026-11-19): the game shipped with no touch controls at
+     all, so on a phone the SENJATA / MISI buttons the player expects did
+     not exist. The touch layer below adds them, plus the joystick. */
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair;
+    /* Round 6 (packet 2): touch-action none is REQUIRED on the look
+       surface. With the default (auto) the browser hijacks a look-drag
+       for scrolling after the first move and fires pointercancel — the
+       drag died after ~60 px, so one full-screen drag only turned the
+       camera 0.2 rad and a 360° look was impossible on a real phone.
+       The round-6 playtest proved it: pointerdown, ONE pointermove,
+       then pointercancel. The touch buttons already had this; the
+       canvas — the actual look area — did not. */
+    touch-action: none; }
   .hidden { display: none !important; }
   /* ---------- HUD ---------- */
   #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
@@ -50,14 +63,45 @@
   #btn-mute { position: absolute; right: 12px; top: 132px; pointer-events: auto; cursor: pointer;
     background: rgba(20,10,40,0.55); color: #fff; border: 1px solid rgba(255,255,255,0.4);
     border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: bold; }
+  /* Round 7: STASIUN / KAMERA / LAMPU — the Halcyon HUD buttons,
+     under the mute button (same gold style as the radio had). */
+  /* Round 7 complete (2026-11-19): 17 packages — cinematic menu,
+     Halcyon A/B controls, top-down camera, day/night cycle, 3 radio
+     stations, horn + headlights, district buildings, roof details,
+     landmark skyline, road markings + correct zebra, sidewalks,
+     street props, parks, blob shadows, fog + sky per phase, varied
+     NPCs, officer in police cars. */
+  #btn-station, #btn-camera, #btn-light { position: absolute; right: 12px; pointer-events: auto; cursor: pointer;
+    background: rgba(20,10,40,0.55); color: #ffd23d; border: 1px solid rgba(255,210,61,0.6);
+    border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: bold; }
+  #btn-station { top: 164px; }
+  #btn-camera { top: 196px; }
+  #btn-light { top: 228px; }
+  /* Round 7 (packet 1): the fade into the game — a black veil that
+     lifts when NEW GAME / CONTINUE starts the world. */
+  #fade { position: fixed; inset: 0; z-index: 9; background: #000; opacity: 0;
+    pointer-events: none; transition: opacity 0.5s ease; }
+  #fade.on { opacity: 1; }
   /* ---------- Screens ---------- */
   .screen { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center;
     justify-content: center; background: linear-gradient(180deg, rgba(26,15,46,0.55), rgba(60,15,60,0.75)); }
+  /* Round 6 (packet 12): the title screen is a window onto the living
+     city, not a dark wall — its overlay is much lighter than the other
+     screens so traffic, pedestrians, neon and swaying palms show
+     through behind the menu card (which keeps its own dark panel). */
+  #screen-title { background: linear-gradient(180deg, rgba(26,15,46,0.22), rgba(60,15,60,0.42)); }
   .card { text-align: center; max-width: 620px; padding: 36px 44px;
     background: rgba(20,8,38,0.82); border: 2px solid #ff7b2d; border-radius: 16px;
     box-shadow: 0 0 60px rgba(255,123,45,0.35); }
   .card h1 { font-size: 54px; letter-spacing: 4px; color: #ff9f1c;
     text-shadow: 0 0 24px #ff5a2d, 0 3px 0 #7a1e00; }
+  /* Round 7 (packet 1) — cinematic title: the logo fades and rises
+     in over the sweeping camera, and the tagline and buttons follow
+     a beat later, so the menu lands like a film title. */
+  @keyframes title-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  #screen-title .card h1 { animation: title-in 1.2s ease-out both; }
+  #screen-title .card .sub { animation: title-in 1.2s 0.35s ease-out both; }
+  #screen-title .card button { animation: title-in 1.2s 0.6s ease-out both; }
   .card h2 { font-size: 26px; letter-spacing: 2px; color: #ffd23d; margin-bottom: 10px; }
   .card p { font-size: 15px; line-height: 1.55; color: #f2e8ff; margin: 10px 0; }
   .card .sub { font-size: 13px; color: #c9b8e8; }
@@ -70,6 +114,117 @@
   .controls-table { text-align: left; margin: 12px auto; font-size: 14px; line-height: 1.9; }
   .controls-table b { color: #ffd23d; display: inline-block; width: 130px; }
   #fullmap { border: 2px solid #ffd23d; border-radius: 8px; background: #2c4a2e; cursor: crosshair; }
+  /* ---------- Touch controls (round 5) ---------- */
+  /* Shown only on touch devices while actually playing: on the title
+     screen the buttons would be dead, so they stay hidden there. */
+  #touch-ui { position: fixed; inset: 0; z-index: 6; pointer-events: none; display: none; }
+  body.touch.touch-playing #touch-ui { display: block; }
+  #touch-ui button { pointer-events: auto; touch-action: none; user-select: none;
+    -webkit-user-select: none; -webkit-touch-callout: none; }
+  #stick { position: absolute; left: 14px; bottom: 132px; width: 124px; height: 124px;
+    border-radius: 50%; background: rgba(20,10,40,0.35); border: 2px solid rgba(255,255,255,0.45);
+    pointer-events: auto; touch-action: none; }
+  #stick-knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px;
+    margin: -28px 0 0 -28px; border-radius: 50%;
+    background: rgba(255,255,255,0.55); border: 2px solid rgba(255,255,255,0.8); }
+  .tbtn { position: absolute; width: 64px; height: 64px; border-radius: 50%;
+    background: rgba(20,10,40,0.6); color: #fff; border: 2px solid rgba(255,255,255,0.5);
+    font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }
+  .tbtn.small { width: 52px; height: 52px; font-size: 10px; }
+  .tbtn.pressed, .tbtn:active { background: #ffd23d; color: #20102e; transform: scale(0.93); }
+  /* Round 6: the active speed mode (LARI or JALAN) lights up green so
+     the player always sees which speed is on. */
+  .tbtn.active { background: #37d67a; color: #0c2416; border-color: #b8ffd2;
+    box-shadow: 0 0 12px rgba(55,214,122,0.8); }
+  /* Round 7 — Halcyon A / B (packet 2): the two BIG buttons bottom
+     right. A (right, orange) is the context action, B (left of it,
+     red) is shoot / horn. Above them the two small utility buttons
+     SENJATA and MISI. In the third column: REM (driving only) and
+     LARI on foot / LAMPU in a car — one slot, two jobs, swapped by
+     body.in-car (set by main.js), so nothing ever overlaps. */
+  .tbtn.big { width: 84px; height: 84px; font-size: 13px; }
+  #btn-touch-a { right: 16px; bottom: 96px;
+    background: linear-gradient(180deg, #ff7b2d, #e84a5f); border-color: #ffd23d; }
+  #btn-touch-b { right: 114px; bottom: 96px;
+    background: linear-gradient(180deg, #e84a5f, #ff7b2d); border-color: #ffd23d; }
+  #btn-touch-weapon { right: 16px; bottom: 196px; }
+  #btn-touch-mission { right: 114px; bottom: 196px; }
+  #btn-touch-brake { right: 212px; bottom: 96px; display: none; }
+  body.in-car #btn-touch-brake { display: block; }
+  #btn-touch-run { right: 212px; bottom: 196px; }
+  #btn-touch-light { right: 212px; bottom: 196px; display: none; }
+  body.in-car #btn-touch-run { display: none; }
+  body.in-car #btn-touch-light { display: block; }
+  #touch-top { position: absolute; right: 12px; top: 168px; display: flex;
+    flex-direction: column; gap: 8px; }
+  #touch-top .tbtn { position: static; }
+  #touch-hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: rgba(255,255,255,0.8); text-shadow: 0 1px 3px #000; white-space: nowrap; }
+  #hud-weapon.flash { color: #fff; background: rgba(255,210,61,0.45); border-radius: 4px; }
+  /* On touch the weapon slots and the desktop help line hide: the
+     SENJATA button plus the weapon line in the bars panel show the
+     weapon, and the touch hint replaces the help line. The minimap
+     shrinks so it never collides with the joystick. */
+  body.touch-playing #hud-weapons, body.touch-playing #hud-help { display: none; }
+  body.touch-playing #minimap-wrap { left: 8px; bottom: 8px; }
+  body.touch-playing #minimap { width: 110px; height: 110px; }
+  /* Narrow phones: the top panel must never overflow the screen. */
+  @media (max-width: 640px) {
+    #hud-top { min-width: 0; width: calc(100vw - 16px); left: 8px; transform: none;
+      padding: 6px 8px; }
+    #hud-mission { font-size: 13px; }
+    #hud-bars { width: 150px; }
+    #hud-right { top: 86px; }
+    #btn-mute { top: 178px; }
+    /* Round 7: on narrow portrait phones the third column (LARI /
+       REM / LAMPU, right:212) lands on the joystick (left:14,
+       124 px wide) — shift it up one row so the thumb zones stay
+       separate. */
+    #btn-touch-run, #btn-touch-light, #btn-touch-brake { bottom: 272px; }
+    /* Round 7: on narrow phones the STASIUN / KAMERA / LAMPU touch
+       buttons cover the radio, camera and lights, so the HUD buttons
+       hide (like the mute button does on short landscape screens). */
+    #btn-station, #btn-camera, #btn-light { display: none; }
+    #touch-top { top: 222px; }
+    #hud-right .panel, #hud-right { padding: 6px 8px; }
+    #hud-money { font-size: 17px; }
+    #hud-stars { font-size: 17px; }
+    #hud-help { display: none; }
+    .card { max-width: calc(100vw - 24px); padding: 22px 18px; }
+    .card h1 { font-size: 40px; }
+    .card button { width: min(280px, 100%); }
+    #fullmap { width: min(520px, calc(100vw - 40px)); height: auto; }
+  }
+  /* Short landscape screens (a phone on its side): the right edge is
+     fully occupied by the action cluster, so the PETA / JEDA / SUARA
+     column would land on top of TEMBAK and REM — a tap on TEMBAK hit
+     JEDA instead (found by the round-5 playtest). On short screens the
+     column docks bottom-left beside the minimap, the HUD mute button
+     hides (SUARA covers it), and the message lines move up clear. */
+  @media (max-height: 560px) {
+    #btn-mute { display: none; }
+    /* Round 7: the HUD STASIUN / KAMERA / LAMPU buttons sat under
+       the REM button here (right edge) — a tap meant for STASIUN hit
+       the handbrake instead. The touch buttons cover them on short
+       screens, like SUARA does for the mute button. The top column
+       now holds five buttons, so they shrink a little to fit. */
+    #btn-station, #btn-camera, #btn-light { display: none; }
+    #touch-top { left: 140px; right: auto; top: auto; bottom: 12px; gap: 6px; }
+    #touch-top .tbtn { width: 46px; height: 46px; font-size: 9px; }
+    #hud-msg { bottom: 120px; }
+    #hud-radio { bottom: 96px; }
+    #touch-hint { display: none; }
+    /* Round 6: the map card (520px map + title + button) was taller
+       than a short landscape screen, so the CLOSE button sat BELOW
+       the viewport — unreachable on a phone on its side (found by
+       the round-6 playtest: PETA opened the map, CLOSE could not be
+       tapped). Shrink the map and the card padding to fit. */
+    #screen-map .card { padding: 12px 16px; max-width: calc(100vw - 24px); }
+    #screen-map .card h2 { font-size: 20px; margin-bottom: 4px; }
+    #screen-map .card p { margin: 4px 0; }
+    #screen-map .card button { margin: 6px auto; padding: 8px; }
+    #fullmap { width: auto; height: min(520px, calc(100vh - 190px)); }
+  }
 </style>
 </head>
 <body>
@@ -103,23 +258,49 @@
     <div class="slot" id="slot-shotgun">4 SHOTGUN</div>
   </div>
   <button id="btn-mute">SOUND: ON</button>
+  <button id="btn-station">STASIUN: SEJA FM</button>
+  <button id="btn-camera">KAMERA: CHASE</button>
+  <button id="btn-light">LAMPU: AUTO</button>
   <div id="hud-msg"></div>
   <div id="hud-radio"></div>
-  <div id="hud-help">WASD move · SHIFT run · SPACE jump · F enter/exit car · E interact · LMB shoot · RMB aim · 1-4 weapons · R reload · M map · ESC pause</div>
+  <div id="hud-help">WASD gerak · SHIFT lari · SPACE lompat · E = A (MASUK/AMBIL/MULAI) · F = B (TEMBAK/KLAKSON) · H klakson · C kamera · L lampu · N stasiun · klik tembak · 1-4 senjata · R isi ulang · M peta · ESC jeda</div>
+</div>
+
+<!-- ======================= TOUCH (round 5, Halcyon A/B in round 7) ======================= -->
+<div id="touch-ui">
+  <div id="stick"><div id="stick-knob"></div></div>
+  <div id="touch-actions">
+    <button class="tbtn big" id="btn-touch-a">MULAI</button>
+    <button class="tbtn big" id="btn-touch-b">TEMBAK</button>
+    <button class="tbtn" id="btn-touch-weapon">SENJATA</button>
+    <button class="tbtn" id="btn-touch-mission">MISI</button>
+    <button class="tbtn" id="btn-touch-brake">REM</button>
+    <button class="tbtn" id="btn-touch-run">LARI</button>
+    <button class="tbtn" id="btn-touch-light">LAMPU</button>
+  </div>
+  <div id="touch-top">
+    <button class="tbtn small" id="btn-touch-map">PETA</button>
+    <button class="tbtn small" id="btn-touch-pause">JEDA</button>
+    <button class="tbtn small" id="btn-touch-mute">SUARA</button>
+    <button class="tbtn small" id="btn-touch-station">STASIUN</button>
+    <button class="tbtn small" id="btn-touch-camera">KAMERA</button>
+  </div>
+  <div id="touch-hint">Joystick: gerak / nyetir · geser layar: lihat · A aksi · B tembak/klakson</div>
 </div>
 
 <!-- ======================= TITLE ======================= -->
+<div id="fade"></div>
 <div class="screen" id="screen-title">
   <div class="card">
     <h1>KOTA SEJA</h1>
-    <p class="sub">An open-world crime story · a sun-soaked island city · sunset, 17:40</p>
+    <p class="sub">An open-world crime story · a sun-soaked island city · from dawn to neon night</p>
     <p>Rico Vega owes <b style="color:#ff9f1c">$50,000</b> to the wrong people.
     One island, four districts, eight jobs — steal cars, outrun the police,
     and take back the city before the debt takes you.</p>
     <button id="btn-new">NEW GAME</button>
     <button id="btn-continue">CONTINUE</button>
     <button id="btn-controls" class="ghost">CONTROLS</button>
-    <p class="sub">Best on desktop Chrome · keyboard + mouse · sound on for the full sunset vibe</p>
+    <p class="sub">Touch controls on phone · joystick + buttons · sound on for the full sunset vibe</p>
   </div>
 </div>
 
@@ -132,12 +313,17 @@
       <div><b>Mouse</b> Look around (click to lock)</div>
       <div><b>SHIFT</b> Run</div>
       <div><b>SPACE</b> Jump / handbrake in a car</div>
-      <div><b>F</b> Enter / exit car</div>
-      <div><b>E</b> Interact / start mission at the hideout</div>
+      <div><b>E</b> Button A — context action: MASUK car · KELUAR car · AMBIL package · MULAI mission · SERANG enemy</div>
+      <div><b>F</b> Button B — TEMBAK on foot · KLAKSON in a car</div>
+      <div><b>H</b> Horn (in a car)</div>
+      <div><b>C</b> Camera: chase / top-down</div>
+      <div><b>L</b> Headlights: auto / on / off</div>
+      <div><b>N</b> Radio station (1→2→3→off): Seja FM · Seja Pop · Seja Malam</div>
       <div><b>Left click</b> Shoot &nbsp; <b>Right click</b> Aim</div>
       <div><b>1 – 4</b> Weapons &nbsp; <b>R</b> Reload</div>
       <div><b>M</b> Full map (click to set a waypoint)</div>
       <div><b>ESC</b> Pause</div>
+      <div><b>Touch</b> Joystick move / drive · drag to look · big A / B buttons · SENJATA cycle weapon · MISI objective · LARI toggle (tap = run, tap again = walk, active lights up green) · REM handbrake (driving) · LAMPU headlights (driving) · KAMERA top-down · STASIUN radio</div>
     </div>
     <button id="btn-controls-back">BACK</button>
   </div>
@@ -157,7 +343,7 @@
 <div class="screen hidden" id="screen-map">
   <div class="card">
     <h2>MAP OF KOTA SEJA</h2>
-    <p class="sub">Click anywhere to set a waypoint. Gold = mission target, pink = hideout.</p>
+    <p class="sub">Click anywhere to set a waypoint. Gold = mission target, pink = hideout, ★ = Menara Seja (landmark).</p>
     <canvas id="fullmap" width="520" height="520"></canvas>
     <button id="btn-map-close">CLOSE (M)</button>
   </div>
