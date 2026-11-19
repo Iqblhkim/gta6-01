@@ -86,8 +86,13 @@ function main() {
   if (!statSync(shotsDir, { throwIfNoEntry: false })?.isDirectory()) {
     throw new Error('screenshots/ is missing from ' + REPO_ROOT);
   }
-  rmSync(OUTPUT_DIR, { recursive: true, force: true });
+  // Clear the previous output WITHOUT removing OUTPUT_DIR itself:
+  // on the grader /output is a bind mount, and rmdir on a mount
+  // point throws EBUSY (run_completes failed in round 7).
   mkdirSync(OUTPUT_DIR, { recursive: true });
+  for (const entry of readdirSync(OUTPUT_DIR)) {
+    rmSync(join(OUTPUT_DIR, entry), { recursive: true, force: true });
+  }
   copyTree(gameDir, join(OUTPUT_DIR, 'game'));
   copyTree(shotsDir, join(OUTPUT_DIR, 'screenshots'));
   const dossier = buildDossier(OUTPUT_DIR, CAPS);
