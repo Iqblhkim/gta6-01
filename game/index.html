@@ -1,391 +1,323 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="id">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Kota Seja — Open-World Crime</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<meta name="color-scheme" content="dark"/>
+<link rel="icon" href="data:,"/>
+<title>Kota Seja 3D — Halcyon Edition</title>
+
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a0f2e;
-    font-family: "Trebuchet MS", Verdana, sans-serif; color: #fff;
-    overscroll-behavior: none; }
-  /* Round 5 (2026-11-19): the game shipped with no touch controls at
-     all, so on a phone the SENJATA / MISI buttons the player expects did
-     not exist. The touch layer below adds them, plus the joystick. */
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair;
-    /* Round 6 (packet 2): touch-action none is REQUIRED on the look
-       surface. With the default (auto) the browser hijacks a look-drag
-       for scrolling after the first move and fires pointercancel — the
-       drag died after ~60 px, so one full-screen drag only turned the
-       camera 0.2 rad and a 360° look was impossible on a real phone.
-       The round-6 playtest proved it: pointerdown, ONE pointermove,
-       then pointercancel. The touch buttons already had this; the
-       canvas — the actual look area — did not. */
-    touch-action: none; }
-  .hidden { display: none !important; }
-  /* ---------- HUD ---------- */
-  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
-  .panel { background: rgba(20, 10, 40, 0.55); border: 1px solid rgba(255,255,255,0.25);
-    border-radius: 10px; padding: 8px 12px; backdrop-filter: blur(2px); }
-  #hud-top { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-    text-align: center; min-width: 420px; }
-  #hud-mission { font-weight: bold; font-size: 15px; letter-spacing: 0.5px; color: #ffd23d; }
-  #hud-stage { font-size: 12px; color: #fff; opacity: 0.9; margin-top: 2px; }
-  #hud-right { position: absolute; top: 12px; right: 12px; text-align: right; }
-  #hud-clock { font-size: 14px; font-weight: bold; }
-  #hud-money { font-size: 22px; font-weight: bold; color: #7dff9a; }
-  #hud-debt { font-size: 11px; color: #ffb3c0; }
-  #hud-stars { font-size: 22px; letter-spacing: 3px; }
-  #hud-bars { position: absolute; left: 12px; top: 12px; width: 210px; }
-  .bar-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: 11px; font-weight: bold; }
-  .bar-row span { width: 52px; }
-  .bar { flex: 1; height: 10px; background: rgba(0,0,0,0.55); border-radius: 5px; overflow: hidden; }
-  .bar > div { height: 100%; }
-  #bar-health { background: #37d67a; width: 100%; }
-  #bar-armour { background: #3fa7d6; width: 0%; }
-  #bar-respect { background: #ff9f1c; width: 0%; }
-  #hud-district { font-size: 12px; color: #ffd23d; margin-top: 4px; letter-spacing: 1px; }
-  #hud-speed { font-size: 13px; margin-top: 2px; }
-  #minimap-wrap { position: absolute; left: 12px; bottom: 12px; }
-  #minimap { border-radius: 50%; border: 3px solid rgba(255,255,255,0.8);
-    background: #2c4a2e; box-shadow: 0 0 12px rgba(0,0,0,0.5); }
-  #hud-weapons { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
-  .slot { background: rgba(20,10,40,0.55); border: 1px solid rgba(255,255,255,0.25);
-    border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: bold; text-align: right; }
-  .slot.active { border-color: #ffd23d; color: #ffd23d; }
-  .slot.locked { opacity: 0.45; }
-  #hud-msg { position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%);
-    font-size: 16px; font-weight: bold; color: #ffd23d; text-shadow: 0 2px 4px #000; text-align: center; }
-  #hud-radio { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-    font-size: 13px; font-style: italic; color: #cfe8ff; text-shadow: 0 2px 4px #000; text-align: center; }
-  #hud-help { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-    font-size: 11px; color: rgba(255,255,255,0.75); text-shadow: 0 1px 3px #000; white-space: nowrap; }
-  #btn-mute { position: absolute; right: 12px; top: 132px; pointer-events: auto; cursor: pointer;
-    background: rgba(20,10,40,0.55); color: #fff; border: 1px solid rgba(255,255,255,0.4);
-    border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: bold; }
-  /* Round 7: STASIUN / KAMERA / LAMPU — the Halcyon HUD buttons,
-     under the mute button (same gold style as the radio had). */
-  /* Round 7 complete (2026-11-19): 17 packages — cinematic menu,
-     Halcyon A/B controls, top-down camera, day/night cycle, 3 radio
-     stations, horn + headlights, district buildings, roof details,
-     landmark skyline, road markings + correct zebra, sidewalks,
-     street props, parks, blob shadows, fog + sky per phase, varied
-     NPCs, officer in police cars. */
-  #btn-station, #btn-camera, #btn-light { position: absolute; right: 12px; pointer-events: auto; cursor: pointer;
-    background: rgba(20,10,40,0.55); color: #ffd23d; border: 1px solid rgba(255,210,61,0.6);
-    border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: bold; }
-  #btn-station { top: 164px; }
-  #btn-camera { top: 196px; }
-  #btn-light { top: 228px; }
-  /* Round 7 (packet 1): the fade into the game — a black veil that
-     lifts when NEW GAME / CONTINUE starts the world. */
-  #fade { position: fixed; inset: 0; z-index: 9; background: #000; opacity: 0;
-    pointer-events: none; transition: opacity 0.5s ease; }
-  #fade.on { opacity: 1; }
-  /* ---------- Screens ---------- */
-  .screen { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center;
-    justify-content: center; background: linear-gradient(180deg, rgba(26,15,46,0.55), rgba(60,15,60,0.75)); }
-  /* Round 6 (packet 12): the title screen is a window onto the living
-     city, not a dark wall — its overlay is much lighter than the other
-     screens so traffic, pedestrians, neon and swaying palms show
-     through behind the menu card (which keeps its own dark panel). */
-  #screen-title { background: linear-gradient(180deg, rgba(26,15,46,0.22), rgba(60,15,60,0.42)); }
-  .card { text-align: center; max-width: 620px; padding: 36px 44px;
-    background: rgba(20,8,38,0.82); border: 2px solid #ff7b2d; border-radius: 16px;
-    box-shadow: 0 0 60px rgba(255,123,45,0.35); }
-  .card h1 { font-size: 54px; letter-spacing: 4px; color: #ff9f1c;
-    text-shadow: 0 0 24px #ff5a2d, 0 3px 0 #7a1e00; }
-  /* Round 7 (packet 1) — cinematic title: the logo fades and rises
-     in over the sweeping camera, and the tagline and buttons follow
-     a beat later, so the menu lands like a film title. */
-  @keyframes title-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
-  #screen-title .card h1 { animation: title-in 1.2s ease-out both; }
-  #screen-title .card .sub { animation: title-in 1.2s 0.35s ease-out both; }
-  #screen-title .card button { animation: title-in 1.2s 0.6s ease-out both; }
-  .card h2 { font-size: 26px; letter-spacing: 2px; color: #ffd23d; margin-bottom: 10px; }
-  .card p { font-size: 15px; line-height: 1.55; color: #f2e8ff; margin: 10px 0; }
-  .card .sub { font-size: 13px; color: #c9b8e8; }
-  .card button { display: block; width: 280px; margin: 10px auto; padding: 12px;
-    font-size: 16px; font-weight: bold; letter-spacing: 1px; cursor: pointer;
-    color: #fff; background: linear-gradient(180deg, #ff7b2d, #e84a5f);
-    border: 1px solid #ffd23d; border-radius: 8px; }
-  .card button:hover { filter: brightness(1.15); }
-  .card button.ghost { background: transparent; border-color: #fff; }
-  .controls-table { text-align: left; margin: 12px auto; font-size: 14px; line-height: 1.9; }
-  .controls-table b { color: #ffd23d; display: inline-block; width: 130px; }
-  #fullmap { border: 2px solid #ffd23d; border-radius: 8px; background: #2c4a2e; cursor: crosshair; }
-  /* ---------- Touch controls (round 5) ---------- */
-  /* Shown only on touch devices while actually playing: on the title
-     screen the buttons would be dead, so they stay hidden there. */
-  #touch-ui { position: fixed; inset: 0; z-index: 6; pointer-events: none; display: none; }
-  body.touch.touch-playing #touch-ui { display: block; }
-  #touch-ui button { pointer-events: auto; touch-action: none; user-select: none;
-    -webkit-user-select: none; -webkit-touch-callout: none; }
-  #stick { position: absolute; left: 14px; bottom: 132px; width: 124px; height: 124px;
-    border-radius: 50%; background: rgba(20,10,40,0.35); border: 2px solid rgba(255,255,255,0.45);
-    pointer-events: auto; touch-action: none; }
-  #stick-knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px;
-    margin: -28px 0 0 -28px; border-radius: 50%;
-    background: rgba(255,255,255,0.55); border: 2px solid rgba(255,255,255,0.8); }
-  .tbtn { position: absolute; width: 64px; height: 64px; border-radius: 50%;
-    background: rgba(20,10,40,0.6); color: #fff; border: 2px solid rgba(255,255,255,0.5);
-    font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }
-  .tbtn.small { width: 52px; height: 52px; font-size: 10px; }
-  .tbtn.pressed, .tbtn:active { background: #ffd23d; color: #20102e; transform: scale(0.93); }
-  /* Round 6: the active speed mode (LARI or JALAN) lights up green so
-     the player always sees which speed is on. */
-  .tbtn.active { background: #37d67a; color: #0c2416; border-color: #b8ffd2;
-    box-shadow: 0 0 12px rgba(55,214,122,0.8); }
-  /* Round 7 — Halcyon A / B (packet 2): the two BIG buttons bottom
-     right. A (right, orange) is the context action, B (left of it,
-     red) is shoot / horn. Above them the two small utility buttons
-     SENJATA and MISI. In the third column: REM (driving only) and
-     LARI on foot / LAMPU in a car — one slot, two jobs, swapped by
-     body.in-car (set by main.js), so nothing ever overlaps. */
-  .tbtn.big { width: 84px; height: 84px; font-size: 13px; }
-  #btn-touch-a { right: 16px; bottom: 96px;
-    background: linear-gradient(180deg, #ff7b2d, #e84a5f); border-color: #ffd23d; }
-  #btn-touch-b { right: 114px; bottom: 96px;
-    background: linear-gradient(180deg, #e84a5f, #ff7b2d); border-color: #ffd23d; }
-  #btn-touch-weapon { right: 16px; bottom: 196px; }
-  #btn-touch-mission { right: 114px; bottom: 196px; }
-  #btn-touch-brake { right: 212px; bottom: 96px; display: none; }
-  body.in-car #btn-touch-brake { display: block; }
-  #btn-touch-run { right: 212px; bottom: 196px; }
-  #btn-touch-light { right: 212px; bottom: 196px; display: none; }
-  body.in-car #btn-touch-run { display: none; }
-  body.in-car #btn-touch-light { display: block; }
-  #touch-top { position: absolute; right: 12px; top: 168px; display: flex;
-    flex-direction: column; gap: 8px; }
-  #touch-top .tbtn { position: static; }
-  #touch-hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-    font-size: 11px; color: rgba(255,255,255,0.8); text-shadow: 0 1px 3px #000; white-space: nowrap; }
-  #hud-weapon.flash { color: #fff; background: rgba(255,210,61,0.45); border-radius: 4px; }
-  /* On touch the weapon slots and the desktop help line hide: the
-     SENJATA button plus the weapon line in the bars panel show the
-     weapon, and the touch hint replaces the help line. The minimap
-     shrinks so it never collides with the joystick. */
-  body.touch-playing #hud-weapons, body.touch-playing #hud-help { display: none; }
-  body.touch-playing #minimap-wrap { left: 8px; bottom: 8px; }
-  body.touch-playing #minimap { width: 110px; height: 110px; }
-  /* Narrow phones: the top panel must never overflow the screen. */
-  @media (max-width: 640px) {
-    #hud-top { min-width: 0; width: calc(100vw - 16px); left: 8px; transform: none;
-      padding: 6px 8px; }
-    #hud-mission { font-size: 13px; }
-    #hud-bars { width: 150px; }
-    #hud-right { top: 86px; }
-    #btn-mute { top: 178px; }
-    /* Round 7: on narrow portrait phones the third column (LARI /
-       REM / LAMPU, right:212) lands on the joystick (left:14,
-       124 px wide) — shift it up one row so the thumb zones stay
-       separate. */
-    #btn-touch-run, #btn-touch-light, #btn-touch-brake { bottom: 272px; }
-    /* Round 7: on narrow phones the STASIUN / KAMERA / LAMPU touch
-       buttons cover the radio, camera and lights, so the HUD buttons
-       hide (like the mute button does on short landscape screens). */
-    #btn-station, #btn-camera, #btn-light { display: none; }
-    #touch-top { top: 222px; }
-    #hud-right .panel, #hud-right { padding: 6px 8px; }
-    #hud-money { font-size: 17px; }
-    #hud-stars { font-size: 17px; }
-    #hud-help { display: none; }
-    .card { max-width: calc(100vw - 24px); padding: 22px 18px; }
-    .card h1 { font-size: 40px; }
-    .card button { width: min(280px, 100%); }
-    #fullmap { width: min(520px, calc(100vw - 40px)); height: auto; }
-  }
-  /* Short landscape screens (a phone on its side): the right edge is
-     fully occupied by the action cluster, so the PETA / JEDA / SUARA
-     column would land on top of TEMBAK and REM — a tap on TEMBAK hit
-     JEDA instead (found by the round-5 playtest). On short screens the
-     column docks bottom-left beside the minimap, the HUD mute button
-     hides (SUARA covers it), and the message lines move up clear. */
-  @media (max-height: 560px) {
-    #btn-mute { display: none; }
-    /* Round 7: the HUD STASIUN / KAMERA / LAMPU buttons sat under
-       the REM button here (right edge) — a tap meant for STASIUN hit
-       the handbrake instead. The touch buttons cover them on short
-       screens, like SUARA does for the mute button. The top column
-       now holds five buttons, so they shrink a little to fit. */
-    #btn-station, #btn-camera, #btn-light { display: none; }
-    #touch-top { left: 140px; right: auto; top: auto; bottom: 12px; gap: 6px; }
-    #touch-top .tbtn { width: 46px; height: 46px; font-size: 9px; }
-    #hud-msg { bottom: 120px; }
-    #hud-radio { bottom: 96px; }
-    #touch-hint { display: none; }
-    /* Round 6: the map card (520px map + title + button) was taller
-       than a short landscape screen, so the CLOSE button sat BELOW
-       the viewport — unreachable on a phone on its side (found by
-       the round-6 playtest: PETA opened the map, CLOSE could not be
-       tapped). Shrink the map and the card padding to fit. */
-    #screen-map .card { padding: 12px 16px; max-width: calc(100vw - 24px); }
-    #screen-map .card h2 { font-size: 20px; margin-bottom: 4px; }
-    #screen-map .card p { margin: 4px 0; }
-    #screen-map .card button { margin: 6px auto; padding: 8px; }
-    #fullmap { width: auto; height: min(520px, calc(100vh - 190px)); }
-  }
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#1a0b2e;font-family:Inter,system-ui,sans-serif;color:#fff;touch-action:none;overscroll-behavior:none}
+button{min-height:44px}
+#game{position:fixed;inset:0;z-index:1}
+#game canvas{position:absolute;inset:0;width:100%;height:100%}
+canvas{display:block}
+:root{--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px)}
+/* MENU */
+/* MENU SCROLL FIX: #menu sendiri kini area gulir vertikal (dulu konten lebih tinggi dari layar
+   terpotong permanen — SETTINGS tak terlihat & tak bisa diklik di desktop 1440×900, karena
+   html,body overflow:hidden dan #menu tidak bisa digulir sama sekali). pointer-events:auto di
+   #menu (dulu none) supaya gestur gulir di area kosong tengah layar pun menggulir menu;
+   menu memang menutupi seluruh layar selama tampil, jadi tidak ada interaksi canvas yang hilang.
+   touch-action:pan-y menimpa touch-action:none global khusus untuk menu ini. Anak-anak flex
+   flex:0 0 auto supaya tidak menyusut/terjepit saat konten melebihi tinggi layar. */
+#menu{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:space-between;padding:calc(14px + var(--sat)) calc(16px + var(--sar)) calc(12px + var(--sab)) calc(16px + var(--sal));pointer-events:auto;background:linear-gradient(180deg,rgba(26,8,46,.15),rgba(10,4,24,.55) 78%);overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,209,102,.55) transparent}
+#menu>*{pointer-events:auto;flex:0 0 auto}
+#menu::-webkit-scrollbar{width:8px}
+#menu::-webkit-scrollbar-thumb{background:rgba(255,209,102,.45);border-radius:99px}
+#menu::-webkit-scrollbar-track{background:transparent}
+.topRow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.logoWrap{text-align:left}
+.logoScript{font-family:Pacifico,"Segoe Script",cursive;color:#ffd166;font-size:clamp(18px,3.5vw,28px);text-shadow:0 2px 18px #ff6b35;margin:0;line-height:1}
+.logo{font-family:"Bebas Neue","Arial Narrow",Impact,sans-serif;font-size:clamp(52px,11vw,110px);line-height:.85;letter-spacing:.04em;margin:2px 0;background:linear-gradient(180deg,#ffe66d 0%,#ff9e00 38%,#ff2e88 72%,#7b2ff7 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 0 #2b0a4a) drop-shadow(0 0 22px rgba(255,110,64,.85))}
+.logoSub{font-weight:800;letter-spacing:.28em;font-size:clamp(10px,2vw,14px);color:#fff;text-transform:uppercase}
+/* HOW TO PLAY: panel kini kolom flex — teks di dalam .howtoScroll yang bergulir sendiri
+   (max-height dibatasi di SEMUA ukuran layar, bukan cuma HP: dulu di desktop panel ini
+   setinggi ~700px dan mendorong tombol menu keluar layar), dan di bawahnya selalu ada
+   bar petunjuk .howtoHint ("Gulir ▾ …") yang TIDAK ikut bergulir, plus bayangan fade di
+   tepi bawah area teks — jadi jelas kelihatan teksnya masih berlanjut & bisa digulir,
+   bukan terpotong diam-diam seperti sebelumnya. */
+.howto{background:rgba(12,6,28,.78);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;max-width:270px;font-size:12px;line-height:1.5;backdrop-filter:blur(8px);display:flex;flex-direction:column;max-height:60vh;overflow:hidden;box-shadow:inset 0 -26px 22px -18px rgba(0,0,0,.9)}
+.howto b{color:#ffd166;letter-spacing:.12em}
+.howtoScroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-right:3px;scrollbar-width:thin;scrollbar-color:rgba(255,209,102,.55) transparent}
+.howtoScroll::-webkit-scrollbar{width:6px}
+.howtoScroll::-webkit-scrollbar-thumb{background:rgba(255,209,102,.45);border-radius:99px}
+.howtoScroll::-webkit-scrollbar-track{background:transparent}
+.howtoHint{flex:0 0 auto;display:flex;align-items:center;justify-content:center;margin:8px -12px -10px;padding:7px 10px;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#ffd166;background:linear-gradient(180deg,rgba(12,6,28,0),rgba(255,209,102,.16) 45%,rgba(12,6,28,.96));border-top:1px solid rgba(255,209,102,.28);pointer-events:none;transition:opacity .25s}
+.howto.atBottom .howtoHint{opacity:.55}
+@media(max-width:700px){.howto{max-width:190px;font-size:10.5px;padding:8px 9px;line-height:1.45;max-height:24vh}.howtoHint{margin:6px -9px -8px;padding:6px 8px;font-size:9px}.topRow{align-items:flex-start}}
+@media(max-height:760px){.menuBtn{padding:9px 14px}.storyCard{display:none}}
+.menuMid{display:flex;gap:16px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
+.menuList{display:flex;flex-direction:column;gap:8px;min-width:min(340px,78vw)}
+.menuBtn{appearance:none;border:1px solid rgba(255,255,255,.22);background:rgba(16,8,34,.82);color:#fff;text-align:left;padding:12px 16px;border-radius:10px;font-weight:800;letter-spacing:.14em;font-size:clamp(14px,2.4vw,18px);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.menuBtn small{font-weight:400;letter-spacing:0;text-transform:none;opacity:.75;font-size:12px}
+.menuBtn.sel{background:linear-gradient(90deg,#ff7a18,#ff2e88);border-color:#ffd166;box-shadow:0 0 0 2px rgba(255,209,102,.35),0 10px 30px rgba(255,46,136,.35);transform:translateX(6px)}
+.menuBtn.disabled{opacity:.45;cursor:not-allowed}
+.storyCard{display:flex;gap:12px;align-items:center;background:rgba(12,6,28,.82);border:1px solid rgba(255,255,255,.16);border-radius:16px;padding:10px 12px;max-width:560px;backdrop-filter:blur(8px)}
+.portrait{width:64px;height:64px;flex:0 0 64px;border-radius:12px;background:linear-gradient(180deg,#ffb36b,#ff5e7a);display:grid;place-items:center;font-size:34px;border:2px solid #ffd166;overflow:hidden}
+.storyCard p{margin:0;font-size:clamp(12px,2vw,13.5px);line-height:1.55;color:#f3efff}
+.storyCard b{color:#ffd166}
+.footNote{font-size:11px;opacity:.85;text-align:center;margin-top:8px}
+/* HUD */
+/* FIX SENTUH: HUD harus DI ATAS lapisan #touch (z 16). Dulu z-index HUD 15 < 16, jadi #lookArea
+   (zona seret kamera, 62% kanan layar, pointer-events:auto) menelan semua sentuhan di kanan atas —
+   tombol Pause & Peta di rel kanan tidak pernah menerima tap. Kini HUD 17: kontainer tetap
+   pointer-events:none, hanya tombol rel yang aktif, jadi seret kamera/joystick/A-B tidak terganggu. */
+#hud{position:fixed;inset:0;z-index:17;pointer-events:none;display:none;padding:calc(10px + var(--sat)) calc(12px + var(--sar)) calc(10px + var(--sab)) calc(12px + var(--sal))}
+#hud.on{display:block}
+.hudTop{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pillRow{display:flex;gap:5px;flex-wrap:nowrap;min-width:0;align-items:center}
+.pill{background:rgba(10,6,24,.72);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 10px;font-weight:800;font-size:12.5px;white-space:nowrap;backdrop-filter:blur(6px)}
+#stars{color:#ffd166;font-size:17px;letter-spacing:2px;text-shadow:0 0 10px rgba(255,209,102,.8);white-space:nowrap}
+@media(max-width:700px){.pill{font-size:11px;padding:5px 7px}.pillRow{gap:4px}#stars{font-size:14px;letter-spacing:1px}}
+.hudMid{display:flex;gap:10px;align-items:flex-start;margin-top:10px}
+#missionBox{flex:1 1 auto;min-width:0;background:rgba(10,6,24,.78);border-left:4px solid #ff2e88;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;overflow-wrap:break-word}
+#missionText{display:block;white-space:normal;overflow-wrap:break-word}
+@media(max-width:700px){#missionBox{font-size:12px;line-height:1.45;padding:8px 10px}}
+#missionBox b{color:#ffd166}
+.hudRail{display:flex;flex-direction:column;align-items:center;gap:8px;flex:0 0 auto}
+#minimapWrap{position:relative;width:70px;height:70px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.75);background:#2e7d46;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#minimap{width:100%;height:100%}
+.railBtns{display:flex;gap:8px}
+.railBtns button{pointer-events:auto;width:42px;height:42px;min-height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(10,6,24,.78);color:#fff;font-size:18px}
+#radioToast{position:absolute;left:50%;transform:translateX(-50%);top:calc(208px + var(--sat));z-index:30;max-width:min(78vw,420px);background:rgba(0,0,0,.78);padding:8px 14px;border-radius:999px;font-weight:700;font-size:13px;opacity:0;transition:.3s;white-space:normal;text-align:center;pointer-events:none}
+#radioToast.show{opacity:1}
+#centerMsg{position:absolute;left:50%;top:22%;transform:translate(-50%,-50%);font-family:"Bebas Neue","Arial Narrow",Impact,sans-serif;font-size:clamp(28px,7vw,56px);letter-spacing:.08em;text-shadow:0 4px 24px rgba(0,0,0,.7);opacity:0;transition:.3s;text-align:center;white-space:nowrap}
+#centerMsg.show{opacity:1}
+/* TOUCH */
+#touch{position:fixed;inset:0;z-index:16;pointer-events:none;display:none}
+#touch.on{display:block}
+#lookArea{position:absolute;right:0;top:0;width:62%;height:100%;pointer-events:auto;touch-action:none;z-index:0}
+#joyBase{position:absolute;left:calc(16px + var(--sal));bottom:calc(22px + var(--sab));width:132px;height:132px;border-radius:50%;background:rgba(255,255,255,.10);border:2px solid rgba(255,255,255,.35);pointer-events:auto;touch-action:none;z-index:2}
+#joyKnob{position:absolute;left:50%;top:50%;width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,.92);transform:translate(-50%,-50%);box-shadow:0 6px 18px rgba(0,0,0,.35);display:grid;place-items:center;color:#221133;font-weight:900}
+.abWrap{position:absolute;right:calc(16px + var(--sar));bottom:calc(22px + var(--sab));display:flex;gap:14px;align-items:flex-end;pointer-events:none;z-index:2}
+.abBtn{width:76px;height:76px;border-radius:50%;border:2px solid rgba(255,255,255,.5);color:#fff;font-weight:900;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;touch-action:none;user-select:none;pointer-events:auto}
+.abBtn span{font-size:22px;line-height:1}.abBtn small{font-size:9px;letter-spacing:.08em;font-weight:800;text-align:center;padding:0 4px}
+#btnA{background:radial-gradient(circle at 35% 30%,#ffb36b,#ff2e88)} #btnB{background:radial-gradient(circle at 35% 30%,#7ee8fa,#4361ee);width:68px;height:68px}
+/* KELUAR: tombol merah khusus mobil, di atas A/B, hanya tampil saat inCar (class .on dari updateAB). miniBtns digeser ke atas saat di mobil supaya tidak tertutup tombol ini. */
+#btnExit{position:absolute;right:calc(16px + var(--sar));bottom:calc(108px + var(--sab));width:66px;height:54px;border-radius:14px;border:2px solid rgba(255,255,255,.55);background:radial-gradient(circle at 35% 30%,#ff7a5c,#d81b26);color:#fff;font-weight:900;display:none;flex-direction:column;align-items:center;justify-content:center;gap:0;touch-action:none;user-select:none;pointer-events:auto;z-index:3;box-shadow:0 6px 18px rgba(216,27,38,.45)}
+#btnExit.on{display:flex}
+#btnExit span{font-size:19px;line-height:1} #btnExit small{font-size:9px;letter-spacing:.08em;font-weight:800}
+#btnExit:active{transform:scale(.94)}
+/* MUNDUR: tombol oranye di baris A/B, hanya tampil saat inCar (class .on dari updateAB); tahan = mundur */
+#btnRev{background:radial-gradient(circle at 35% 30%,#ffd166,#e67e22);width:68px;height:68px;display:none}
+#btnRev.on{display:flex}
+#btnRev:active{transform:scale(.94)}
+/* TOKO: tombol melayang emas, hanya tampil saat pemain dekat Toko Seja (class .on dari updateABThrottled) */
+#btnShopFloat{position:absolute;left:calc(16px + var(--sal));bottom:calc(168px + var(--sab));width:64px;height:54px;border-radius:14px;border:2px solid rgba(255,255,255,.55);background:radial-gradient(circle at 35% 30%,#ffe082,#e6a817);color:#231400;font-weight:900;display:none;flex-direction:column;align-items:center;justify-content:center;gap:0;touch-action:none;user-select:none;pointer-events:auto;z-index:3;box-shadow:0 6px 18px rgba(230,168,23,.45)}
+#btnShopFloat.on{display:flex}
+#btnShopFloat span{font-size:19px;line-height:1} #btnShopFloat small{font-size:9px;letter-spacing:.08em;font-weight:800}
+#btnShopFloat:active{transform:scale(.94)}
+/* RUMAH: tombol melayang hijau di atas tombol TOKO, hanya tampil saat dekat pintu rumah (MASUK) atau dekat pintu keluar di dalam rumah (KELUAR) — class .on dari updateABThrottled */
+#btnHouseFloat{position:absolute;left:calc(16px + var(--sal));bottom:calc(230px + var(--sab));width:64px;height:54px;border-radius:14px;border:2px solid rgba(255,255,255,.55);background:radial-gradient(circle at 35% 30%,#b9f6ca,#2e9e4f);color:#06280f;font-weight:900;display:none;flex-direction:column;align-items:center;justify-content:center;gap:0;touch-action:none;user-select:none;pointer-events:auto;z-index:3;box-shadow:0 6px 18px rgba(46,158,79,.45)}
+#btnHouseFloat.on{display:flex}
+#btnHouseFloat span{font-size:19px;line-height:1} #btnHouseFloat small{font-size:9px;letter-spacing:.08em;font-weight:800}
+#btnHouseFloat:active{transform:scale(.94)}
+/* TOKO: daftar belanja di dalam modal */
+.shopSec{font-weight:900;letter-spacing:.1em;color:#ffd166;margin:14px 0 6px;font-size:13px}
+.shopItem{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 10px;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-bottom:8px;background:rgba(255,255,255,.04)}
+.shopItem .siName{font-weight:800;font-size:14px}
+.shopItem .siDesc{font-size:12px;opacity:.75;line-height:1.4}
+.shopItem button{white-space:nowrap}
+.shopItem button:disabled{opacity:.45;cursor:not-allowed}
+#touch.incar .miniBtns{bottom:calc(174px + var(--sab))}
+.abBtn:active{transform:scale(.94)} .abBtn.dim{opacity:.45;filter:grayscale(.6)}
+.miniBtns{position:absolute;right:calc(16px + var(--sar));bottom:calc(126px + var(--sab));display:flex;gap:6px;pointer-events:none;z-index:2}
+.miniBtns button{pointer-events:auto;width:40px;height:40px;min-height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(10,6,24,.78);color:#fff;font-size:16px}
+/* MODALS */
+.modal{position:fixed;inset:0;z-index:30;display:none;place-items:center;background:rgba(5,2,14,.72);padding:16px}
+.modal.on{display:grid}
+.card{background:#170b31;border:1px solid rgba(255,255,255,.18);border-radius:18px;max-width:680px;width:100%;max-height:88vh;overflow:auto;padding:20px;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.card h2{font-family:"Bebas Neue","Arial Narrow",Impact,sans-serif;letter-spacing:.08em;font-size:34px;margin:0 0 8px}
+.card button{background:#ff2e88;color:#fff;border:0;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:14px;line-height:1.6}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+#bigMapCanvas{width:100%;height:auto;background:#0e2a22;border-radius:12px}
+label.row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1);font-size:14px}
+select,input[type=range]{accent-color:#ff2e88}
+/* MISI TAHAP 1: timer, petunjuk, dialog, ending */
+#missionTimer{display:none;margin-top:6px;font-weight:900;color:#ffd166;font-size:15px;letter-spacing:.04em}
+#missionTimer.on{display:block}
+#missionTimer.low{color:#ff5e7a;animation:tblink .6s infinite alternate}
+@keyframes tblink{from{opacity:1}to{opacity:.45}}
+#missionHint{display:none;margin-top:6px;background:rgba(255,209,102,.16);border:1px solid rgba(255,209,102,.55);color:#ffe9a8;border-radius:8px;padding:6px 8px;font-weight:700;font-size:12.5px}
+#missionHint.on{display:block}
+/* TAHAP 4 — info misi sampingan: baris ringkas di dalam kotak misi (objektif + timer), warna emas */
+#sideInfo{display:none;margin-top:6px;background:rgba(255,179,0,.13);border:1px solid rgba(255,179,0,.55);color:#ffe9a8;border-radius:8px;padding:6px 8px;font-weight:700;font-size:12.5px}
+#sideInfo.on{display:block}
+#dialogBox{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(168px + var(--sab));z-index:28;width:min(92vw,520px);background:rgba(10,6,24,.94);border:1px solid rgba(255,209,102,.6);border-left:5px solid #ffd166;border-radius:14px;padding:12px 14px;display:none;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+#dialogBox.on{display:block}
+#dialogName{color:#ffd166;font-weight:900;letter-spacing:.08em;font-size:12px;margin-bottom:4px}
+#dialogText{font-size:14.5px;line-height:1.55;min-height:44px}
+#btnDialogNext{margin-top:10px;width:100%;min-height:48px;border:0;border-radius:10px;background:#ff2e88;color:#fff;font-weight:900;font-size:15px;cursor:pointer}
+/* ROUND 10 — TUTORIAL: kartu kecil di bawah layar, game TIDAK pause — pemain tetap bisa
+   bergerak saat kartu tampil. Tombol LANJUT/LEWATI di bawah kartu, mudah dijangkau jempol. */
+#tutCard{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(168px + var(--sab));z-index:18;width:min(340px,88vw);background:rgba(10,6,24,.92);border:1px solid rgba(255,209,102,.55);border-radius:14px;padding:10px 12px;text-align:center;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+#tutCard.on{display:block}
+#tutStepLabel{font-size:11px;font-weight:900;letter-spacing:.14em;color:#ffd166;text-transform:uppercase}
+#tutIcon{font-size:30px;line-height:1.1;margin:4px 0 0}
+#tutTitle{font-family:"Bebas Neue","Arial Narrow",Impact,sans-serif;font-size:20px;letter-spacing:.06em;margin:2px 0 4px}
+#tutText{font-size:13px;line-height:1.5;margin:0 auto;max-width:320px;min-height:40px}
+#tutText b{color:#ffd166}
+#tutDots{color:#ffd166;font-size:13px;letter-spacing:6px;margin:6px 0 8px}
+.tutBtns{display:flex;gap:10px}
+.tutBtns button{flex:1;min-height:46px;border:0;border-radius:12px;font-weight:900;font-size:15px;cursor:pointer}
+#btnTutNext{background:#ff2e88;color:#fff}
+#btnTutSkip{flex:0 0 100px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.3)}
+/* ROUND 10 — BANNER PERFORMA: kecil di sudut kanan atas (di bawah rel minimap), tidak memblokir
+   pandangan & joystick; game tetap jalan saat banner tampil. */
+#perfBanner{display:none;position:fixed;top:calc(230px + var(--sat));right:calc(12px + var(--sar));z-index:18;width:min(250px,64vw);background:rgba(10,6,24,.92);border:1px solid rgba(255,209,102,.55);border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+#perfBanner.on{display:block}
+#perfBanner .perfBtns{display:flex;gap:8px;margin-top:8px}
+#perfBanner .perfBtns button{flex:1;min-height:38px;border:0;border-radius:10px;font-weight:900;font-size:12.5px;cursor:pointer}
+#btnPerfYes{background:#ff2e88;color:#fff}
+#btnPerfNo{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.3)}
+/* ROUND 10 — SKALA CERITA: baris ringkas di dalam kotak misi. */
+#storyLine{margin-top:6px;font-weight:800;font-size:12px;color:#ffe9a8;letter-spacing:.02em}
+/* TOKO: footer TUTUP lengket di bawah kartu */
+.shopFoot{flex:0 0 auto;margin:14px -20px -20px;padding:12px 20px calc(14px + var(--sab));background:#170b31;border-top:1px solid rgba(255,255,255,.18)}
+/* TOKO SCROLL FIX: kartu toko = kolom flex; judul+saldo menempel di atas, daftar (#shopList) SATU-SATUNYA area
+   yang bergulir (overflow-y auto + touch-action pan-y supaya geser sentuh di HP benar-benar menggulir daftar,
+   tidak lagi tertelan handler touchmove game), tombol TUTUP menempel di bawah, tombol X tetap di pojok modal. */
+#modalShop .card{display:flex;flex-direction:column;overflow:hidden}
+#modalShop .card h2,#modalShop .card>p{flex:0 0 auto}
+#shopList{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;padding-right:2px}
+.shopCloseBtn{width:100%;min-height:52px;border:0;border-radius:12px;background:#d81b26;color:#fff;font-weight:900;font-size:16px;letter-spacing:.04em;cursor:pointer}
+.endCredits{line-height:1.8;font-size:14px}
+.endCredits b{color:#ffd166}
+/* DEBUG OVERLAY */
+#dbgPanel{display:none;position:fixed;left:calc(8px + var(--sal));top:calc(148px + var(--sat));z-index:55;width:min(218px,58vw);max-height:172px;overflow:hidden;background:rgba(2,8,6,.78);border:1px solid rgba(0,255,170,.45);border-radius:10px;padding:7px 9px;font-family:ui-monospace,Menlo,Consolas,monospace;color:#b8ffd9;backdrop-filter:blur(4px)}
+#dbgPanel .dbgHead{display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:700;letter-spacing:.08em;color:#00ffaa;margin-bottom:4px}
+#dbgPanel .dbgHead button{min-height:24px;height:24px;padding:0 7px;margin-left:5px;border-radius:6px;border:1px solid rgba(0,255,170,.5);background:rgba(0,60,40,.6);color:#b8ffd9;font-size:10px;font-family:inherit;cursor:pointer}
+#dbgBody{margin:0;font-size:10.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+#dbgChip{position:fixed;left:calc(8px + var(--sal));top:calc(148px + var(--sat));z-index:55;min-height:30px;height:30px;padding:0 10px;border-radius:8px;border:1px solid rgba(0,255,170,.5);background:rgba(2,8,6,.78);color:#00ffaa;font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;cursor:pointer}
+/* BOOT ERROR PANEL */
+#bootError{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:70;width:min(92vw,430px);background:#2a0a1e;border:2px solid #ff2e55;border-radius:16px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#bootError .beTitle{font-weight:900;font-size:17px;margin-bottom:8px;color:#ffb3c2}
+#bootErrorMsg{font-size:13.5px;line-height:1.6;color:#ffe9ee}
+#bootError .beBtns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+#bootError .beBtns button{flex:1;min-height:48px;border:0;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer}
+#btnLite{background:#ffd166;color:#231400}
+#btnRetryBoot{background:#ff2e88;color:#fff}
+/* LABEL VERSI + OVERLAY DIAGNOSA BESAR (5 detik pertama) */
+#verTag{display:none;position:fixed;left:calc(8px + var(--sal));bottom:calc(6px + var(--sab));z-index:56;font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;color:rgba(255,255,255,.75);background:rgba(0,0,0,.35);padding:2px 7px;border-radius:6px;pointer-events:none}
+#bigDbg{display:none;position:fixed;left:50%;top:11%;transform:translateX(-50%);z-index:65;width:min(92vw,460px);pointer-events:none;background:rgba(2,10,6,.92);border:2px solid #00ffaa;border-radius:16px;padding:16px 18px;font-family:ui-monospace,Menlo,Consolas,monospace;color:#b8ffd9;box-shadow:0 24px 70px rgba(0,0,0,.65)}
+#bigDbg .bdTitle{font-size:15px;font-weight:900;letter-spacing:.1em;color:#00ffaa;margin-bottom:10px;text-align:center}
+#bigDbgBody{margin:0;font-size:14px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
+#bigDbg .bdNote{margin-top:10px;font-size:11px;opacity:.75;text-align:center}
 </style>
 </head>
 <body>
-<canvas id="game" width="960" height="600"></canvas>
 
-<!-- ======================= HUD ======================= -->
-<div id="hud" class="hidden">
-  <div id="hud-top" class="panel">
-    <div id="hud-mission">MISSION 1/8 · FRESH AIR</div>
-    <div id="hud-stage">STAGE 1/2 · NEXT ▸ Hideout</div>
-  </div>
-  <div id="hud-right" class="panel">
-    <div id="hud-clock">DAY 1 · 17:40</div>
-    <div id="hud-money">$250</div>
-    <div id="hud-debt">DEBT $50,000</div>
-    <div id="hud-stars">☆☆☆☆☆</div>
-  </div>
-  <div id="hud-bars" class="panel">
-    <div class="bar-row"><span>HEALTH <b id="hud-health-num">100</b></span><div class="bar"><div id="bar-health"></div></div></div>
-    <div class="bar-row"><span>ARMOUR</span><div class="bar"><div id="bar-armour"></div></div></div>
-    <div class="bar-row"><span>RESPECT</span><div class="bar"><div id="bar-respect"></div></div></div>
-    <div id="hud-district">DOWNTOWN</div>
-    <div id="hud-speed">0 km/h</div>
-    <div id="hud-weapon" style="color:#ffd23d">PISTOL 12/48</div>
-  </div>
-  <div id="minimap-wrap"><canvas id="minimap" width="180" height="180"></canvas></div>
-  <div id="hud-weapons">
-    <div class="slot" id="slot-fists">1 FISTS</div>
-    <div class="slot" id="slot-pistol">2 PISTOL</div>
-    <div class="slot" id="slot-smg">3 SMG</div>
-    <div class="slot" id="slot-shotgun">4 SHOTGUN</div>
-  </div>
-  <button id="btn-mute">SOUND: ON</button>
-  <button id="btn-station">STASIUN: SEJA FM</button>
-  <button id="btn-camera">KAMERA: CHASE</button>
-  <button id="btn-light">LAMPU: AUTO</button>
-  <div id="hud-msg"></div>
-  <div id="hud-radio"></div>
-  <div id="hud-help">WASD gerak · SHIFT lari · SPACE lompat · E = A (MASUK/AMBIL/MULAI) · F = B (TEMBAK/KLAKSON) · H klakson · C kamera · L lampu · N stasiun · klik tembak · 1-4 senjata · R isi ulang · M peta · ESC jeda</div>
-</div>
+<div id="verTag" style="display:none">v4</div>
+<div id="bigDbg" style="display:none"><div class="bdTitle">🛠 DIAGNOSA 3D — v4</div><pre id="bigDbgBody">Memulai tes WebGL…</pre><div class="bdNote">Panel ini hilang sendiri setelah 4 detik. Panel kecil hilang otomatis saat mulai main — buka lagi dari menu Pause › Diagnosa.</div></div>
+<div id="game"></div>
 
-<!-- ======================= TOUCH (round 5, Halcyon A/B in round 7) ======================= -->
-<div id="touch-ui">
-  <div id="stick"><div id="stick-knob"></div></div>
-  <div id="touch-actions">
-    <button class="tbtn big" id="btn-touch-a">MULAI</button>
-    <button class="tbtn big" id="btn-touch-b">TEMBAK</button>
-    <button class="tbtn" id="btn-touch-weapon">SENJATA</button>
-    <button class="tbtn" id="btn-touch-mission">MISI</button>
-    <button class="tbtn" id="btn-touch-brake">REM</button>
-    <button class="tbtn" id="btn-touch-run">LARI</button>
-    <button class="tbtn" id="btn-touch-light">LAMPU</button>
-  </div>
-  <div id="touch-top">
-    <button class="tbtn small" id="btn-touch-map">PETA</button>
-    <button class="tbtn small" id="btn-touch-pause">JEDA</button>
-    <button class="tbtn small" id="btn-touch-mute">SUARA</button>
-    <button class="tbtn small" id="btn-touch-station">STASIUN</button>
-    <button class="tbtn small" id="btn-touch-camera">KAMERA</button>
-  </div>
-  <div id="touch-hint">Joystick: gerak / nyetir · geser layar: lihat · A aksi · B tembak/klakson</div>
-</div>
-
-<!-- ======================= TITLE ======================= -->
-<div id="fade"></div>
-<div class="screen" id="screen-title">
-  <div class="card">
-    <h1>KOTA SEJA</h1>
-    <p class="sub">An open-world crime story · a sun-soaked island city · from dawn to neon night</p>
-    <p>Rico Vega owes <b style="color:#ff9f1c">$50,000</b> to the wrong people.
-    One island, four districts, eight jobs — steal cars, outrun the police,
-    and take back the city before the debt takes you.</p>
-    <button id="btn-new">NEW GAME</button>
-    <button id="btn-continue">CONTINUE</button>
-    <button id="btn-controls" class="ghost">CONTROLS</button>
-    <p class="sub">Touch controls on phone · joystick + buttons · sound on for the full sunset vibe</p>
-  </div>
-</div>
-
-<!-- ======================= CONTROLS ======================= -->
-<div class="screen hidden" id="screen-controls">
-  <div class="card">
-    <h2>CONTROLS</h2>
-    <div class="controls-table">
-      <div><b>W A S D</b> Walk / drive</div>
-      <div><b>Mouse</b> Look around (click to lock)</div>
-      <div><b>SHIFT</b> Run</div>
-      <div><b>SPACE</b> Jump / handbrake in a car</div>
-      <div><b>E</b> Button A — context action: MASUK car · KELUAR car · AMBIL package · MULAI mission · SERANG enemy</div>
-      <div><b>F</b> Button B — TEMBAK on foot · KLAKSON in a car</div>
-      <div><b>H</b> Horn (in a car)</div>
-      <div><b>C</b> Camera: chase / top-down</div>
-      <div><b>L</b> Headlights: auto / on / off</div>
-      <div><b>N</b> Radio station (1→2→3→off): Seja FM · Seja Pop · Seja Malam</div>
-      <div><b>Left click</b> Shoot &nbsp; <b>Right click</b> Aim</div>
-      <div><b>1 – 4</b> Weapons &nbsp; <b>R</b> Reload</div>
-      <div><b>M</b> Full map (click to set a waypoint)</div>
-      <div><b>ESC</b> Pause</div>
-      <div><b>Touch</b> Joystick move / drive · drag to look · big A / B buttons · SENJATA cycle weapon · MISI objective · LARI toggle (tap = run, tap again = walk, active lights up green) · REM handbrake (driving) · LAMPU headlights (driving) · KAMERA top-down · STASIUN radio</div>
+<!-- MENU -->
+<section id="menu">
+  <div class="topRow">
+    <div class="logoWrap">
+      <p class="logoScript">Welcome to</p>
+      <h1 class="logo">KOTA SEJA</h1>
+      <div class="logoSub">Halcyon Edition • Sunset City • Est. 1986</div>
     </div>
-    <button id="btn-controls-back">BACK</button>
+    <aside class="howto" id="howtoPanel"><div class="howtoScroll" id="howtoScroll"><b>HOW TO PLAY</b><br>🕹️ Joystick kiri — jalan / setir<br>👉 Seret sisi kanan layar — putar kamera 360°<br><b>A</b> — lari / gas &nbsp; <b>B</b> — masuk mobil / serang<br>🚗 Dekati mobil lalu tekan <b>MASUK</b> · 🛒 <b>TOKO SEJA</b> ($) · 🏠 <b>RUMAH</b> bisa dimasuki<br>⭐ Hindari polisi, selesaikan misi, kumpulkan uang.<br><span style="opacity:.8">Detail lengkap: tombol <b>CONTROLS</b> di menu ↓</span></div><div class="howtoHint" id="howtoHint" aria-hidden="true">Gulir ▾ masih ada di bawah</div></aside>
   </div>
+  <div>
+    <div class="menuMid">
+      <nav class="menuList" id="menuList">
+        <button class="menuBtn disabled" data-act="continue" id="btnContinue">CONTINUE <small id="continueNote">No saved game yet</small></button>
+        <button class="menuBtn sel" data-act="new">NEW GAME <small>›</small></button>
+        <button class="menuBtn" data-act="controls">CONTROLS <small>›</small></button>
+        <button class="menuBtn" data-act="settings">SETTINGS <small>›</small></button>
+      </nav>
+      <div class="storyCard">
+        <div class="portrait" aria-hidden="true"><svg viewBox="0 0 64 64" width="64" height="64"><rect width="64" height="64" fill="#ffb36b"/><circle cx="32" cy="26" r="13" fill="#e8b08a"/><path d="M19 24 Q32 8 45 24 L45 18 Q32 10 19 18Z" fill="#1a120a"/><rect x="19" y="23" width="26" height="6" rx="3" fill="#111"/><rect x="22" y="25" width="8" height="3" fill="#7ee8fa"/><rect x="34" y="25" width="8" height="3" fill="#7ee8fa"/><path d="M14 64 Q18 44 32 44 Q46 44 50 64Z" fill="#ff5e3a"/><path d="M26 46 L32 56 L38 46 L32 50Z" fill="#ffd166"/></svg></div>
+        <p><b>RICO VEGA</b> — Mantan kurir pelabuhan yang berutang <b>$50,000</b> ke sindikat Azura. Satu pulau, empat distrik, delapan pekerjaan. Curi mobil, kabur dari polisi, dan rebut kembali Kota Seja sebelum matahari terbenam untuk terakhir kalinya.</p>
+      </div>
+    </div>
+    <div class="footNote">Touch controls on phone · joystick + buttons · sound on for the full sunset vibe • Halcyon Edition</div>
+  </div>
+</section>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hudTop">
+    <div class="pillRow"><span class="pill">💰 $<span id="money">250</span></span><span class="pill">❤️ <span id="health">100</span>%</span><span class="pill">🔫 <span id="weapon">Tinju</span></span><span class="pill">💊 <span id="medkitN">0</span></span><span class="pill" id="carPill" style="display:none">🚗 <span id="carHp">100</span>% ⛽ <span id="carFuel">100</span>%</span><span class="pill" id="clock">17:40</span></div>
+    <div id="stars">☆☆☆☆☆</div>
+  </div>
+  <div class="hudMid">
+    <div id="missionBox"><b>BAB 1 — SAMBUTAN HANGAT</b><br><span id="missionText">Pergi ke penanda merah di dekat dermaga. Ambil paketnya.</span><div id="storyLine">📖 CERITA 0/5 • 🎯 Sampingan: 0</div><div id="missionTimer"></div><div id="missionHint"></div><div id="sideInfo"></div></div>
+    <div class="hudRail">
+      <div id="minimapWrap"><canvas id="minimap" width="184" height="184"></canvas></div>
+      <div class="railBtns"><button id="btnPause" aria-label="Pause">⏸️</button><button id="btnMapTop" aria-label="Peta">🗺️</button></div>
+      <div class="railBtns"><button id="btnSideTop" aria-label="Misi Sampingan" style="display:none">🎯</button></div>
+    </div>
+  </div>
+  <div id="centerMsg"></div><div id="radioToast">📻 SEJA FM</div>
 </div>
 
-<!-- ======================= PAUSE ======================= -->
-<div class="screen hidden" id="screen-pause">
-  <div class="card">
-    <h2>PAUSED</h2>
-    <p>Kota Seja waits for no one — except right now.</p>
-    <button id="btn-resume">RESUME</button>
-    <button id="btn-quit" class="ghost">SAVE &amp; QUIT TO TITLE</button>
+<div id="dialogBox" role="dialog" aria-label="Dialog"><div id="dialogName">INFORMAN</div><div id="dialogText">…</div><button id="btnDialogNext" type="button">LANJUT ▶</button></div>
+<!-- TOUCH CONTROLS -->
+<div id="touch">
+  <div id="lookArea" aria-hidden="true"></div>
+  <div id="joyBase"><div id="joyKnob">●</div></div>
+  <div class="miniBtns"><button id="btnRadio" aria-label="Radio">📻</button><button id="btnCam" aria-label="Kamera">📷</button><button id="btnWeapon" aria-label="Senjata">👊</button><button id="btnMedkit" aria-label="Pakai medkit">💊</button></div>
+  <div class="abWrap">
+    <button class="abBtn" id="btnRev"><span>⏪</span><small>MUNDUR</small></button>
+    <button class="abBtn" id="btnB"><span id="icoB">🚗</span><small id="labB">MASUK</small></button>
+    <button class="abBtn" id="btnA"><span id="icoA">🏃</span><small id="labA">LARI</small></button>
   </div>
+  <button id="btnExit"><span>🚪</span><small>KELUAR</small></button>
+  <button id="btnShopFloat"><span>🛒</span><small>TOKO</small></button>
+  <button id="btnHouseFloat"><span>🏠</span><small>MASUK</small></button>
 </div>
 
-<!-- ======================= MAP ======================= -->
-<div class="screen hidden" id="screen-map">
-  <div class="card">
-    <h2>MAP OF KOTA SEJA</h2>
-    <p class="sub">Click anywhere to set a waypoint. Gold = mission target, pink = hideout, ★ = Menara Seja (landmark).</p>
-    <canvas id="fullmap" width="520" height="520"></canvas>
-    <button id="btn-map-close">CLOSE (M)</button>
-  </div>
-</div>
+<!-- MODALS -->
+<div class="modal" id="modalControls"><div class="card"><h2>Controls</h2><div class="grid2"><div>🕹️ <b>Joystick</b> — Bergerak / menyetir (relatif kamera)</div><div>👉 <b>Seret kanan layar</b> — Putar kamera 360°</div><div><b>Tombol A</b> — Lari (jalan kaki) / Gas (mobil)</div><div><b>Tombol B</b> — Masuk mobil • di luar mobil: <b>SERANG</b> (pukul/tebas/tembak sesuai senjata, ke arah hadap; tahan B = SMG otomatis)</div><div>⏪ <b>Tombol MUNDUR</b> — Tahan untuk mundur (hanya saat di mobil) • <b>S / ↓</b> juga mundur</div><div><b>B di mobil</b> — Tap: klakson • Tahan 1 dtk: lampu</div><div>🚪 <b>Tombol KELUAR</b> — Keluar mobil (merah, di atas A/B, hanya saat di mobil; mobil harus berhenti dulu)</div><div><b>WASD / Panah</b> — Bergerak</div><div><b>E</b> — Masuk / keluar mobil • <b>F</b> — Serang (tahan = tembakan beruntun) • <b>Q</b> — Ganti senjata</div><div><b>C</b> — Kamera • <b>R</b> — Radio • <b>M</b> — Peta (toggle) • <b>Esc</b> — Pause / tutup menu • <b>Shift</b> — Lari / drift</div><div><b>Spasi</b> — Handbrake / drift di mobil</div><div>🛒 <b>Tombol TOKO</b> — Muncul saat dekat toko mana pun (Toko Seja $, Bengkel B, SPBU + di peta); toko juga bisa dibuka dari menu Pause</div><div>🏠 <b>Rumah</b> — Rumah Rico &amp; beberapa rumah warga berpenanda hijau bisa dimasuki: dekati pintu, tekan tombol MASUK RUMAH atau E; di dalam rumah, dekati pintu (keset hijau) lalu tekan KELUAR / E untuk keluar lagi</div><div><b>T</b> — Buka toko terdekat (saat dekat tokonya)</div><div>💊 <b>Tombol 💊 / H</b> — Pakai medkit (+50 HP) • 🚗 Health &amp; bensin mobil tampil di HUD saat mengemudi; mobil berasap perbaiki di Bengkel, bensin habis isi di SPBU/Bengkel</div><div>🚦 <b>Lampu merah</b> — Lalu lintas berhenti di lampu merah &amp; menjaga jarak antar mobil. 🚔 <b>Polisi</b> mengejar lewat jalan raya; wanted hanya turun bila polisi kehilangan jejakmu (jauh + tak terlihat) atau kamu ganti mobil. Wanted 2★+: <b>polisi jalan kaki</b> ikut mengejar &amp; bisa menangkapmu. Wanted 4–5★: ada <b>roadblock</b>, sirene &amp; <b>helikopter polisi</b> — selama lampu sorotnya mengenaimu, jejakmu tidak putus!</div><div>🚗 <b>Carjack</b> — Rebut mobil warga (lewat tombol MASUK) menaikkan wanted; mobil garasi milikmu sendiri bebas</div></div><br><button data-close>TUTUP</button></div></div>
+<div class="modal" id="modalSettings"><div class="card"><h2>Settings</h2>
+<label class="row">Kualitas grafis <select id="setQuality"><option value="high">Tinggi</option><option value="low">Hemat (30+ FPS HP)</option></select></label>
+<label class="row">Volume musik <input type="range" id="setMusic" min="0" max="100" value="70"></label>
+<label class="row">Volume ambient ombak <input type="range" id="setAmb" min="0" max="100" value="60"></label>
+<label class="row">Kamera default <select id="setCam"><option value="chase">Chase Cam 3D</option><option value="top">Top-Down Klasik</option></select></label>
+<label class="row">Getaran (HP) <select id="setVib"><option value="on">Nyala</option><option value="off">Mati</option></select></label>
+<label class="row">Auto-aim <select id="setAutoAim"><option value="on">Nyala</option><option value="off">Mati</option></select></label>
+<br><button data-close>SIMPAN &amp; TUTUP</button></div></div>
+<div class="modal" id="modalMap"><div class="card"><h2>Peta Kota Seja</h2><canvas id="bigMapCanvas" width="640" height="640"></canvas><p style="font-size:13px;line-height:1.6">🔴 Misi &nbsp; 🔵 Kamu &nbsp; 💲 Toko Seja ($) &nbsp; 🔧 Bengkel Seja (B) — perbaiki mobil &amp; isi bensin &nbsp; ⛽ SPBU Seja (+) — bensin &amp; medkit &nbsp; ✚ Medkit &nbsp; 💵 Uang &nbsp; 🟢 Taman Senja &nbsp; 🏠 Rumah (bisa dimasuki) &nbsp; Distrik: Pelabuhan (SW) • Neon Strip (SE) • Marina (NW) • Bukit Halcyon (NE)</p><button data-close>TUTUP PETA</button> <button id="btnResume2">LANJUT MAIN</button></div></div>
+<div class="modal" id="modalPause"><div class="card"><h2>Paused</h2><p id="pauseStats" style="line-height:1.7"></p><button id="btnResume">▶ LANJUT</button> <button id="btnShop">🛒 TOKO</button> <button id="btnSide">🎯 MISI SAMPINGAN</button> <button id="btnToMap">🗺️ PETA</button> <button id="btnShowDebug" type="button">🛠 Diagnosa</button> <button id="btnToMenu">MENU UTAMA</button></div></div>
+<div id="perfBanner"><span id="perfText"></span><div class="perfBtns"><button id="btnPerfYes" type="button">⚡ HEMAT</button><button id="btnPerfNo" type="button">TUTUP</button></div></div>
+<div id="tutCard"><div id="tutStepLabel">Langkah 1 dari 5</div><div id="tutIcon">🕹️</div><h2 id="tutTitle" style="font-size:20px">Bergerak</h2><p id="tutText"></p><div id="tutDots">●○○○○</div><div class="tutBtns"><button id="btnTutSkip" type="button">LEWATI</button><button id="btnTutNext" type="button">LANJUT ▶</button></div></div>
+<div class="modal" id="modalShop"><div class="card"><h2 id="shopTitle">🛒 Toko Seja</h2><p style="margin:0 0 6px;line-height:1.6">Saldo kamu: <b style="color:#ffd166">$<span id="shopMoney">250</span></b><br><span id="shopIntro" style="font-size:13px;opacity:.85">Senjata, mobil &amp; pakaian yang dibeli langsung bisa dipakai. Mobil yang dibeli menunggu di GARASI, selatan titik awal.</span></p><div id="shopList"></div><div class="shopFoot"><button class="shopCloseBtn" data-close type="button">✕ TUTUP TOKO — KEMBALI MAIN</button></div></div></div>
 
-<!-- ======================= MISSION COMPLETE ======================= -->
-<div class="screen hidden" id="screen-mission">
-  <div class="card">
-    <h2>MISSION COMPLETE</h2>
-    <p id="mission-complete-text">Clean work, Rico. The city is watching.</p>
-    <button id="btn-mission">CONTINUE</button>
-  </div>
-</div>
+<div class="modal" id="modalSide"><div class="card"><h2>🎯 Misi Sampingan</h2><p id="sideIntro" style="margin:0 0 6px;line-height:1.6;font-size:13.5px"></p><div id="sideList"></div><br><button data-close>TUTUP</button></div></div>
+<div class="modal" id="modalFail"><div class="card"><h2>❌ MISI GAGAL</h2><p id="failText" style="line-height:1.7"></p><p style="line-height:1.7;opacity:.85">Checkpoint aktif: misi yang sudah selesai <b>tidak</b> hilang. Ulangi misi ini saja.</p><button id="btnRetryMission" type="button" style="width:100%;min-height:52px;font-size:16px">↻ ULANGI MISI DARI CHECKPOINT</button></div></div>
+<div class="modal" id="modalEnding"><div class="card"><h2>🏆 KOTA SEJA BEBAS!</h2><div class="endCredits"><p>Bos Azura tumbang di pelabuhan. Utang Rico lunas, dermaga kembali tenang, dan matahari terbenam di atas Kota Seja — kali ini sebagai kota yang bebas.</p><p><b>— KREDIT —</b><br>Pemeran: <b>Rico Vega</b><br>Lawan: Sindikat Azura • Informan misterius • Polisi Kota Seja<br>Kota: Pelabuhan • Neon Strip • Marina • Bukit Halcyon • Taman Senja</p><p id="endStats"></p></div><br><button id="btnPlayAgain" type="button" style="width:100%;min-height:52px;font-size:16px;margin-bottom:8px">▶ MAIN LAGI (dari Misi 1)</button><button id="btnFreeRoam" type="button" style="width:100%;min-height:52px;font-size:16px;background:#4361ee">🗺️ JELAJAH BEBAS</button></div></div>
+<div id="dbgPanel" style="display:none"><div class="dbgHead"><span>🛠 DIAGNOSA 3D</span><span><button id="btnLite2" type="button">Mode Ringan</button><button id="btnDbgHide" type="button">✕</button></span></div><pre id="dbgBody">Memuat diagnosa…</pre></div>
+<button id="dbgChip" type="button" style="display:none">DBG</button>
+<div id="bootError" style="display:none"><div class="beTitle">⚠️ Dunia 3D belum tampil</div><div id="bootErrorMsg"></div><div class="beBtns"><button id="btnLite" type="button">Mode Ringan</button><button id="btnRetryBoot" type="button">Coba Lagi</button></div></div>
+<div id="glError" style="display:none;position:fixed;inset:auto 12px calc(12px + env(safe-area-inset-bottom,0px)) 12px;z-index:60;background:#5b1030;border:1px solid #ff5e7a;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5"></div>
 
-<!-- ======================= BUSTED ======================= -->
-<div class="screen hidden" id="screen-busted">
-  <div class="card">
-    <h2 style="color:#7fb8d9">BUSTED</h2>
-    <p>The police caught up with you. Fine paid, heat cleared — but the debt is still there.</p>
-    <button id="btn-busted">RESPAWN</button>
-  </div>
-</div>
 
-<!-- ======================= WASTED ======================= -->
-<div class="screen hidden" id="screen-wasted">
-  <div class="card">
-    <h2 style="color:#e84a5f">WASTED</h2>
-    <p>Rico went down in the streets of Kota Seja. The city patched him up — for a price.</p>
-    <button id="btn-wasted">RESPAWN</button>
-  </div>
-</div>
-
-<!-- ======================= STORY COMPLETE ======================= -->
-<div class="screen hidden" id="screen-complete">
-  <div class="card">
-    <h2>KING OF SOLANO</h2>
-    <p>Eight jobs. One island. The debt is paid, the hideout is yours, and the
-    sunset over Kota Seja has never looked better. Thanks for playing, Rico.</p>
-    <button id="btn-complete">KEEP EXPLORING</button>
-  </div>
-</div>
-
-<script type="module" src="./src/main.js"></script>
+<!-- Round 9 additions: Taksi Seja + photo mode UI (fresh styles, Halcyon Edition round 9). -->
+<style>
+/* TAKSI: baris status di dalam kotak misi — cyan, sejajar dengan #sideInfo emas. */
+#taxiInfo{display:none;margin-top:6px;background:rgba(0,229,255,.12);border:1px solid rgba(0,229,255,.55);color:#c8f6ff;border-radius:8px;padding:6px 8px;font-weight:700;font-size:12.5px}
+#taxiInfo.on{display:block}
+/* MODE FOTO: semua HUD + kontrol sentuh disembunyikan, hanya bar foto yang tampil. */
+body.photo #hud,body.photo #touch,body.photo #dialogBox,body.photo #radioToast,body.photo #centerMsg{display:none!important}
+#photoBar{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + var(--sab));z-index:40;gap:8px;background:rgba(10,6,24,.85);border:1px solid rgba(255,209,102,.5);border-radius:999px;padding:8px 10px;align-items:center}
+body.photo #photoBar{display:flex}
+#photoBar span{font-weight:800;font-size:12.5px;color:#ffe9a8;white-space:nowrap}
+#photoBar button{min-height:44px;border:0;border-radius:999px;padding:8px 14px;font-weight:900;font-size:13px;cursor:pointer}
+#btnPhotoSnap{background:#ffd166;color:#231400}
+#btnPhotoExit{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.35)}
+</style>
+<div id="photoBar"><span>📸 MODE FOTO — layar bersih, tekan P / ✕ untuk keluar</span><button id="btnPhotoSnap" type="button">📸 AMBIL FOTO</button><button id="btnPhotoExit" type="button">✕ KELUAR</button></div>
+<script src="vendor/three.min.js"></script>
+<script src="src/shots.js"></script>
+<script src="src/game.js"></script>
+<script src="src/hint.js"></script>
 </body>
 </html>
