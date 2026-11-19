@@ -2,14 +2,14 @@
 // This is the biggest module: it owns every entity and rule, and it knows
 // nothing about the DOM, WebGL or audio, so the same code runs in the
 // browser and in the Node unit tests.
-import { CONFIG, districtAt } from './config.js';
+import { CONFIG, districtAt, dayPhaseAt } from './config.js';
 import { makeRng } from './random.js';
 import { buildCity, onRoad, nearestRoadPoint, resolveBuildingCollision, carColour } from './city.js';
 
 const TAU = Math.PI * 2;
 export const WEAPON_ORDER = ['fists', 'pistol', 'smg', 'shotgun'];
 
-function angleLerp(a, b, t) {
+export function angleLerp(a, b, t) {
   let d = b - a;
   while (d > Math.PI) d -= TAU;
   while (d < -Math.PI) d += TAU;
@@ -53,6 +53,29 @@ export function createWorld(seed = CONFIG.seed) {
     radioTimer: 0,
     cameraYaw: Math.PI,
     cameraPitch: 0.32,
+    // Round 7 — Halcyon settings, saved with the game (serialize):
+    // camMode 'chase' (round 5/6 follow cam) or 'top' (top-down);
+    // station 0..2 = the radio station index (audio.js); lights
+    // 'auto' (on at night, the default), 'on' or 'off'.
+    settings: { camMode: 'chase', station: 0, lights: 'auto' },
+    // Round 7 — day phase (dayPhaseAt(clockHours), refreshed every
+    // update) and the effective headlight state: on when the setting
+    // is 'on', or when 'auto' and the phase counts as night. It
+    // starts as the sunset phase, not null, so the title screen and
+    // the HUD can read it before the first update runs.
+    dayPhase: dayPhaseAt(CONFIG.dayStartHours),
+    carLightsOn: false,
+    // Round 7 — contextual actions (Halcyon A/B): recomputed every
+    // update by computeContext() and read by the HUD/buttons.
+    contextA: { action: 'attack', label: 'SERANG' },
+    contextB: { action: 'shoot', label: 'TEMBAK' },
+    // Round 7 — horn: seconds left of the current honk (drives the
+    // sound in main.js and the pedestrian reaction in update).
+    hornTimer: 0,
+    // Round 6 (packet 12): the living title screen orbits this
+    // intersection (roads x=26 and z=26 cross here) — streets,
+    // traffic and pedestrians in every direction.
+    titleFocus: { x: 26, z: 26 },
     player: {
       x: city.spawn.x, z: city.spawn.z, y: 0, vy: 0,
       angle: city.spawn.angle, speed: 0, health: 100, armour: 0,
@@ -62,6 +85,9 @@ export function createWorld(seed = CONFIG.seed) {
       owned: { fists: true, pistol: true, smg: false, shotgun: false },
       fireCooldown: 0, reloadTimer: 0, reloading: false,
       invulnerable: 0,
+      // Round 6: walk-cycle phase (drives Rico's leg/arm swing) and
+      // gun recoil (0..1, decays; poses the shooting arm + muzzle flash).
+      walkPhase: 0, recoil: 0,
     },
     cars: [],
     peds: [],
@@ -71,6 +97,15 @@ export function createWorld(seed = CONFIG.seed) {
     rivals: [],
     targetCar: null,
     particles: [],
+    // Round 6: visible shooting effects — one tracer per pellet, a
+    // muzzle flash at the gun tip, a camera shake that decays.
+    tracers: [],     // {x0,y0,z0,x1,y1,z1,life,maxLife}
+    muzzle: null,    // {x,y,z,life} — null when no flash is showing
+    shake: 0,        // 0..1 camera shake, decays every frame
+    // Round 6: nearest car the player can enter (null when on foot and
+    // far away, or while driving) — the renderer draws the red GTA-style
+    // marker above it. Recomputed every frame in update().
+    nearCar: null,
     mission: {
       index: 0, stage: 0, sub: 0, timer: 0, active: false,
       collected: 0, checkpoints: 0, damageTaken: 0, sabotage: 0,
@@ -114,16 +149,116 @@ export function createWorld(seed = CONFIG.seed) {
   }
   // Pedestrians: wandering the sidewalks and crosswalks.
   const pedNames = ['Ayu', 'Budi', 'Sari', 'Dedi', 'Lina', 'Rudi', 'Maya', 'Agus', 'Nina', 'Joko'];
+  const PED_SKINS = ['#f2c89b', '#c98d5f', '#8a5a3b', '#f7d7b0'];
+  const PED_HAIR = ['#1c1410', '#3a2a1a', '#6a6a6a', '#c9a227', '#7a3b1e'];
+  const PED_PANTS = ['#2b2b33', '#3a4a6b', '#5a3a2a', '#4a4a4a', '#7a6a4a'];
   for (let i = 0; i < CONFIG.pedCount; i++) {
     const p = nearestRoadPoint(city, rng.range(-220, 220), rng.range(-170, 170));
     world.peds.push({
       id: i, name: pedNames[i % pedNames.length], x: p.x + rng.range(-4, 4), z: p.z + rng.range(-4, 4),
       angle: rng.range(0, TAU), speed: 0, shirt: rng.pick(PED_SHIRTS),
-      skin: rng.pick(['#f2c89b', '#c98d5f', '#8a5a3b', '#f7d7b0']),
+      skin: rng.pick(PED_SKINS),
+      // Round 7 (packet 17) — NPC VARIETY: hair style + colour,
+      // trousers and an accessory, so the 48 pedestrians stop
+      // looking like clones in different shirts. The draw space is
+      // 4 skins × 8 shirts × 5 hair styles × 5 hair colours × 5
+      // trousers × 3 accessories — no two peds share the full look
+      // by construction. Height varies ±8% per pedestrian.
+      hairStyle: rng.pick(['short', 'long', 'bald', 'cap', 'hat']),
+      hairColor: rng.pick(PED_HAIR),
+      pants: rng.pick(PED_PANTS),
+      accessory: rng.pick(['none', 'none', 'none', 'glasses', 'bag']),
+      heightScale: rng.range(0.92, 1.08),
       state: 'walk', walkPhase: rng.range(0, TAU), target: null, panic: 0,
     });
   }
   return world;
+}
+
+// ------------------------------------------------------------------ Halcyon context (round 7)
+// The two big touch buttons (and the E / F keys) are CONTEXTUAL: what
+// A and B do depends on where Rico is and what is near him. This pure
+// function answers that question from the world state, so the HUD,
+// the touch buttons and the unit tests all agree on the labels.
+//   In a car:  A = KELUAR (exit), B = KLAKSON (horn).
+//   On foot:   A = MASUK (near a car) / AMBIL (near a package or a
+//              hidden collectible) / MULAI (near the hideout with a
+//              mission waiting) / SERANG (otherwise — attack with the
+//              current weapon); B = TEMBAK (fire) or PUKUL (fists).
+export function computeContext(world) {
+  const p = world.player;
+  const car = playerCar(world);
+  if (car) {
+    return {
+      a: { action: 'exit', label: 'KELUAR' },
+      b: { action: 'horn', label: 'KLAKSON' },
+    };
+  }
+  const t = missionTarget(world);
+  const nearPackage = t
+    && ((world.mission.index === 1 && world.mission.stage === 0)
+      || world.mission.index === 6)
+    && dist2(p.x, p.z, t.x, t.z) < t.r * t.r;
+  const nearCollectible = world.city.collectibles.some(
+    (c) => !c.taken && dist2(p.x, p.z, c.x, c.z) < 16);
+  const nearHideout = !world.mission.active
+    && dist2(p.x, p.z, world.city.hideout.x, world.city.hideout.z) < 625;
+  let a;
+  if (world.nearCar) a = { action: 'enter', label: 'MASUK' };
+  else if (nearPackage || nearCollectible) a = { action: 'pickup', label: 'AMBIL' };
+  else if (nearHideout) a = { action: 'start', label: 'MULAI' };
+  else a = { action: 'attack', label: 'SERANG' };
+  return {
+    a,
+    b: { action: 'shoot', label: p.weapon === 'fists' ? 'PUKUL' : 'TEMBAK' },
+  };
+}
+
+// A = AMBIL pressed: pick up a hidden collectible within reach right
+// now (walking over one already collects it — this is the deliberate
+// button path), or acknowledge a mission package target in range.
+// Returns true when something was actually picked up.
+export function collectNearby(world) {
+  const p = world.player;
+  for (const col of world.city.collectibles) {
+    if (!col.taken && dist2(p.x, p.z, col.x, col.z) < 16) {
+      col.taken = true;
+      world.stats.collectibles++;
+      world.money += 100;
+      showMessage(world, 'Hidden package found! +$100 (' + world.stats.collectibles + '/10)', 3);
+      return true;
+    }
+  }
+  const t = missionTarget(world);
+  if (t && dist2(p.x, p.z, t.x, t.z) < t.r * t.r) {
+    showMessage(world, 'Paket diambil!', 2);
+    return true;
+  }
+  return false;
+}
+
+// B = KLAKSON pressed while driving: the horn sounds (main.js plays
+// it while hornTimer is up) and the pedestrians ahead of the car
+// step aside — a short panic plus a sidestep out of the car's path.
+export function honkHorn(world) {
+  const car = playerCar(world);
+  if (!car) return false;
+  world.hornTimer = CONFIG.horn.dur;
+  const fx = Math.sin(car.angle), fz = Math.cos(car.angle);
+  for (const pd of world.peds) {
+    const dx = pd.x - car.x, dz = pd.z - car.z;
+    const ahead = dx * fx + dz * fz;
+    const side = Math.abs(dx * fz - dz * fx);
+    if (ahead > 0 && ahead < CONFIG.horn.reactRadius && side < 4) {
+      pd.panic = Math.max(pd.panic, CONFIG.horn.reactSeconds);
+      pd.state = 'flee';
+      const s = (dx * fz - dz * fx) >= 0 ? 1 : -1;
+      pd.x += fz * s * 2.5;
+      pd.z += -fx * s * 2.5;
+    }
+  }
+  showMessage(world, 'KLAKSON!', 1);
+  return true;
 }
 
 // ------------------------------------------------------------------ helpers
@@ -260,6 +395,15 @@ export function tryShoot(world) {
   const ox = car ? car.x : p.x;
   const oz = car ? car.z : p.z;
   const aim = car ? car.angle : p.angle;
+  // Round 6 — shooting feedback: the gun kicks (recoil poses the arm),
+  // the camera shudders, and a muzzle flash burns at the gun tip.
+  // Muzzle tip: just past the hand on foot, past the bonnet in a car.
+  p.recoil = 1;
+  world.shake = Math.max(world.shake, 0.35);
+  const muzzleX = ox + Math.sin(aim) * (car ? 2.6 : 0.9);
+  const muzzleZ = oz + Math.cos(aim) * (car ? 2.6 : 0.9);
+  const muzzleY = (car ? 1.2 : 1.3) + (p.y || 0);
+  world.muzzle = { x: muzzleX, y: muzzleY, z: muzzleZ, life: 0.09 };
   const pellets = def.pellets ?? 1;
   let hitAnything = false;
   for (let k = 0; k < pellets; k++) {
@@ -307,6 +451,17 @@ export function tryShoot(world) {
     } else {
       spawnParticles(world, ox + dx * def.range, oz + dz * def.range, 2, '#aaa');
     }
+    // Round 6 — visible bullet: a glowing tracer from the muzzle to
+    // the hit point (or to max range on a miss), plus a bright impact
+    // burst where it lands. Tracers decay in update(), the renderer
+    // draws them as thin light streaks.
+    world.tracers.push({
+      x0: muzzleX, y0: muzzleY, z0: muzzleZ,
+      x1: ox + dx * bestT, y1: best ? 1.0 : muzzleY, z1: oz + dz * bestT,
+      life: 0.14, maxLife: 0.14,
+    });
+    if (best) spawnParticles(world, ox + dx * bestT, oz + dz * bestT, 3, '#ffffff');
+    if (world.tracers.length > 24) world.tracers.splice(0, world.tracers.length - 24);
   }
   // Firing a gun in public is a crime the city notices: the first shot
   // puts the police on Rico, later shots keep the heat from cooling off.
@@ -566,6 +721,58 @@ function updatePolice(world, dt) {
   }
 }
 
+// ------------------------------------------------------------------ title backdrop
+// Round 6 (packet 12) — the LIVING title screen: while the menu is
+// up, traffic rolls, pedestrians stroll and the clock of the city
+// keeps ticking, all with the same systems the game uses (no second
+// city, no duplicated code). Deliberately LIGHT for phones: no
+// collisions with the player, no police, no missions, no particles
+// spawning — just cars on the roads and people on the sidewalks.
+// The day clock is NOT advanced here, so the sunset stays at 17:40
+// until the player actually starts playing.
+export function updateTitleBackdrop(world, dt) {
+  dt = Math.min(dt, 0.1);
+  world.time += dt;
+  const city = world.city;
+  for (const c of world.cars) {
+    if (!c.traffic || c.owner === 'player') continue;
+    c.speed = 9; // steady cruise past the menu
+    const nx = c.x + Math.sin(c.angle) * c.speed * dt;
+    const nz = c.z + Math.cos(c.angle) * c.speed * dt;
+    const probe = { x: nx, z: nz };
+    if (!resolveBuildingCollision(city, probe, 2.2)) { c.x = nx; c.z = nz; }
+    const nearX = city.roadXs.some((rx) => Math.abs(c.x - rx) < 1.2);
+    const nearZ = city.roadZs.some((rz) => Math.abs(c.z - rz) < 1.2);
+    if ((nearX || nearZ) && world.rng.chance(dt * 0.3)) {
+      c.angle += world.rng.chance(0.5) ? Math.PI / 2 : -Math.PI / 2;
+    }
+    if (c.x < -city.halfX || c.x > city.halfX || c.z < -city.halfZ || c.z > city.halfZ) {
+      c.angle += Math.PI;
+      c.x = clamp(c.x, -city.halfX + 4, city.halfX - 4);
+      c.z = clamp(c.z, -city.halfZ + 4, city.halfZ - 4);
+    }
+  }
+  for (const pd of world.peds) {
+    pd.walkPhase += dt * 7;
+    if (!pd.target || dist2(pd.x, pd.z, pd.target.x, pd.target.z) < 4) {
+      const np = nearestRoadPoint(city, pd.x + world.rng.range(-60, 60), pd.z + world.rng.range(-60, 60));
+      pd.target = np;
+    }
+    const ta = Math.atan2(pd.target.x - pd.x, pd.target.z - pd.z);
+    pd.angle = angleLerp(pd.angle, ta, dt * 6);
+    pd.x += Math.sin(pd.angle) * CONFIG.pedWalkSpeed * dt;
+    pd.z += Math.cos(pd.angle) * CONFIG.pedWalkSpeed * dt;
+    pd.x = clamp(pd.x, -city.halfX, city.halfX);
+    pd.z = clamp(pd.z, -city.halfZ, city.halfZ);
+  }
+  for (const pt of world.particles) {
+    pt.life -= dt;
+    pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.z += pt.vz * dt;
+    pt.vy -= 6 * dt;
+  }
+  world.particles = world.particles.filter((pt) => pt.life > 0);
+}
+
 // ------------------------------------------------------------------ update
 export function update(world, input, dt) {
   // Clamped so a slow frame never jumps the physics, but wide enough
@@ -575,10 +782,31 @@ export function update(world, input, dt) {
   world.time += dt;
   world.clockHours += dt * (24 / CONFIG.dayLengthSeconds);
   if (world.clockHours >= 24) { world.clockHours -= 24; world.day++; }
+  // Round 7 (packet 4) — the full day/night cycle: the phase is
+  // refreshed every frame from the clock, and the headlights follow
+  // the lights setting ('on', or 'auto' + night). The renderer reads
+  // world.dayPhase for the sky, fog and sun; the HUD reads it for the
+  // phase name. Mission 6 still fails at dawn (see updateMission).
+  world.dayPhase = dayPhaseAt(world.clockHours);
+  world.carLightsOn = world.settings.lights === 'on'
+    || (world.settings.lights === 'auto' && world.dayPhase.night);
   const p = world.player;
   const city = world.city;
   if (p.fireCooldown > 0) p.fireCooldown -= dt;
   if (p.invulnerable > 0) p.invulnerable -= dt;
+  // Round 6: shooting feedback decays — recoil eases the arm back,
+  // the shake settles, the muzzle flash burns out, tracers fade.
+  if (p.recoil > 0) p.recoil = Math.max(0, p.recoil - dt * 6);
+  if (world.shake > 0) world.shake = Math.max(0, world.shake - dt * 1.8);
+  // Round 7: the horn note dies with its timer (main.js plays the
+  // sound while hornTimer is up).
+  if (world.hornTimer > 0) world.hornTimer = Math.max(0, world.hornTimer - dt);
+  if (world.muzzle) {
+    world.muzzle.life -= dt;
+    if (world.muzzle.life <= 0) world.muzzle = null;
+  }
+  for (const tr of world.tracers) tr.life -= dt;
+  world.tracers = world.tracers.filter((tr) => tr.life > 0);
   if (p.reloading) {
     p.reloadTimer -= dt;
     if (p.reloadTimer <= 0) finishReload(world);
@@ -586,12 +814,43 @@ export function update(world, input, dt) {
   if (world.messageTimer > 0) world.messageTimer -= dt;
   if (world.radioTimer > 0) world.radioTimer -= dt;
 
-  // Camera follows the mouse look.
+  // Camera follows the mouse look — and the look deltas are consumed
+  // exactly once, right here. Round 5 fixed a nasty bug: main.js used to
+  // put the consumed deltas back, so one mouse move (or one touch drag)
+  // kept turning the camera forever and the character spun in circles,
+  // unable to walk straight. A delta now turns the camera once.
+  // Round 6: cameraYaw is deliberately NEVER clamped — it wraps
+  // naturally through sin/cos in the movement and camera code, so a
+  // full 360° look-drag is possible. The only thing that used to stop
+  // a full turn was the chase camera pulling the yaw back to the car's
+  // heading; main.js now leaves the view alone for 5 s after a manual
+  // look (CONFIG.camLookGraceMs).
   world.cameraYaw += (input.lookDX || 0) * 0.0032;
   world.cameraPitch = clamp(world.cameraPitch + (input.lookDY || 0) * 0.0022, -0.1, 0.9);
+  input.lookDX = 0;
+  input.lookDY = 0;
   if (input.weaponSlot) {
     const key = WEAPON_ORDER[input.weaponSlot - 1];
     if (key && p.owned[key]) { p.weapon = key; p.reloading = false; }
+    input.weaponSlot = 0;
+  }
+  // SENJATA button (touch): cycle to the next OWNED weapon only. The old
+  // behaviour stepped 1-2-3-4 and silently ignored locked slots, so from
+  // the pistol the first two taps changed nothing at all — the button
+  // felt dead. Every tap now answers with a HUD message.
+  if (input.cycleWeapon) {
+    input.cycleWeapon = false;
+    const owned = WEAPON_ORDER.filter((k) => p.owned[k]);
+    const cur = owned.indexOf(p.weapon);
+    const next = owned[(cur + 1) % owned.length] ?? 'fists';
+    if (next !== p.weapon) {
+      p.weapon = next;
+      p.reloading = false;
+      const def = CONFIG.weapons[next];
+      showMessage(world, 'Weapon: ' + def.name + (def.mag === Infinity ? '' : '  ' + p.ammo[next] + '/' + (p.reserve[next] ?? 0)), 2);
+    } else {
+      showMessage(world, 'Only ' + CONFIG.weapons[p.weapon].name + ' in your arsenal — SMG and Shotgun come with missions 3 and 4.', 3);
+    }
   }
   if (input.reload) { reloadWeapon(world); input.reload = false; }
   if (input.shoot || input.shootPulse) { tryShoot(world); input.shootPulse = false; }
@@ -599,16 +858,46 @@ export function update(world, input, dt) {
   // ---- driving or walking
   const car = playerCar(world);
   if (car) {
-    const steer = (input.left ? 1 : 0) - (input.right ? 1 : 0);
-    const forward = input.forward ? 1 : 0;
-    const back = input.back ? 1 : 0;
-    if (forward) car.speed += CONFIG.carAccel * dt;
-    else if (back) car.speed -= (car.speed > 0.5 ? CONFIG.carBrake : CONFIG.carAccel * 0.6) * dt;
-    else car.speed -= Math.sign(car.speed) * 8 * dt;
-    if (Math.abs(car.speed) < 0.2 && !forward && !back) car.speed = 0;
+    // Round 5 handling: analog steering from the touch joystick (or the
+    // digital keys), ramped toward its target so the car leans into a
+    // turn instead of snapping; a punchy launch that tapers near top
+    // speed; steering that bites at low speed and softens at the top;
+    // and a handbrake (SPACE on desktop, REM on touch) that trades
+    // grip for a sharp drift turn.
+    const steerTarget = Math.abs(input.steer || 0) > 0.12
+      ? clamp(input.steer, -1, 1)
+      : (input.left ? 1 : 0) - (input.right ? 1 : 0);
+    car.steer = (car.steer ?? 0) + (steerTarget - (car.steer ?? 0)) * Math.min(1, CONFIG.carSteerSmooth * dt);
+    const throttle = Math.abs(input.throttle || 0) > 0.12
+      ? clamp(input.throttle, -1, 1)
+      : (input.forward ? 1 : 0) - (input.back ? 1 : 0);
+    const handbrake = input.handbrake || input.jump;
+    input.jump = false;
+    const speedAbs = Math.abs(car.speed);
+    if (throttle > 0) {
+      if (car.speed < -0.5) car.speed += CONFIG.carBrake * throttle * dt;
+      else {
+        const pull = CONFIG.carAccelLow + (CONFIG.carAccelHigh - CONFIG.carAccelLow) * (speedAbs / CONFIG.carMaxSpeed);
+        car.speed += pull * throttle * dt;
+      }
+    } else if (throttle < 0) {
+      if (car.speed > 0.5) car.speed += CONFIG.carBrake * throttle * dt;
+      else car.speed += CONFIG.carAccel * 0.6 * throttle * dt;
+    } else if (handbrake) {
+      car.speed -= Math.sign(car.speed) * CONFIG.carHandbrakeDecel * dt;
+    } else {
+      car.speed -= Math.sign(car.speed) * 8 * dt;
+    }
+    if (Math.abs(car.speed) < 0.2 && throttle === 0 && !handbrake) car.speed = 0;
     car.speed = clamp(car.speed, -CONFIG.carMaxReverse, CONFIG.carMaxSpeed);
     const dirSign = car.speed >= 0 ? 1 : -1;
-    car.angle += steer * CONFIG.carTurnRate * dt * dirSign * clamp(Math.abs(car.speed) / 8, 0, 1);
+    const turnRate = CONFIG.carTurnLow + (CONFIG.carTurnHigh - CONFIG.carTurnLow) * (speedAbs / CONFIG.carMaxSpeed);
+    const grip = clamp(speedAbs / 8, 0.15, 1);
+    car.angle += car.steer * turnRate * (handbrake ? CONFIG.carHandbrakeTurn : 1) * dt * dirSign * grip;
+    // Handbrake at speed kicks up tyre smoke behind the car.
+    if (handbrake && speedAbs > 10 && world.rng.chance(dt * 20)) {
+      spawnParticles(world, car.x - Math.sin(car.angle) * 2, car.z - Math.cos(car.angle) * 2, 2, '#bbbbbb');
+    }
     const nx = car.x + Math.sin(car.angle) * car.speed * dt;
     const nz = car.z + Math.cos(car.angle) * car.speed * dt;
     const probe = { x: nx, z: nz };
@@ -641,7 +930,11 @@ export function update(world, input, dt) {
     }
     p.x = car.x; p.z = car.z; p.angle = car.angle;
   } else {
-    const moveSpeed = input.run ? CONFIG.runSpeed : CONFIG.walkSpeed;
+    // Round 5: the joystick is analog — a half-pushed stick walks, a
+    // full push runs. Keyboard stays digital.
+    const stickMag = Math.hypot(input.joyX || 0, input.joyY || 0);
+    const moveSpeed = (input.run ? CONFIG.runSpeed : CONFIG.walkSpeed)
+      * (stickMag > 0.12 ? 0.4 + 0.6 * Math.min(1, stickMag) : 1);
     const f = (input.forward ? 1 : 0) - (input.back ? 1 : 0);
     const s = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     // Movement is relative to the camera yaw.
@@ -650,6 +943,10 @@ export function update(world, input, dt) {
     const mz = Math.cos(cy) * f - Math.sin(cy) * s;
     const len = Math.hypot(mx, mz) || 1;
     p.speed = (f || s) ? moveSpeed : 0;
+    // Round 6: the walk cycle advances with distance actually covered,
+    // so Rico's legs/arms swing at the speed he moves — and freeze
+    // when he stands still (then only his breathing moves, in render).
+    if (f || s) p.walkPhase += dt * p.speed * 1.7;
     if (f || s) {
       p.angle = Math.atan2(mx, mz);
       const nx = p.x + (mx / len) * moveSpeed * dt;
@@ -670,6 +967,43 @@ export function update(world, input, dt) {
       if (p.y <= 0) { p.y = 0; p.vy = 0; p.onGround = true; }
     }
   }
+  // Round 6 — enterable-car marker: on foot, the nearest car within
+  // 5 m is remembered so the renderer can draw the pulsing red GTA
+  // marker above it. It clears the moment Rico drives (he is already
+  // in a car) or walks away — nearestCar returns null past 5 m.
+  // Round 7: nearCar is set BEFORE the context is computed, so the A
+  // label is right on the very first frame after walking up to a car
+  // (it used to lag one frame behind the marker).
+  world.nearCar = car ? null : nearestCar(world, p.x, p.z, 5);
+  // Round 7 — contextual A/B (Halcyon): the labels are recomputed
+  // from the world every frame (computeContext) and the HUD + touch
+  // buttons read world.contextA / world.contextB. E = A and F = B on
+  // the keyboard; the touch buttons set input.actionA / actionB.
+  // A = MASUK/KELUAR reuses the enterCar path below (the old MOBIL
+  // button and the F key used to do this — the context button is the
+  // only way in and out of a car now, so there is no duplicate).
+  const ctx = computeContext(world);
+  world.contextA = ctx.a;
+  world.contextB = ctx.b;
+  if (input.actionA) {
+    input.actionA = false;
+    if (ctx.a.action === 'enter' || ctx.a.action === 'exit') input.enterCar = true;
+    else if (ctx.a.action === 'start' && !world.mission.active) startMission(world);
+    else if (ctx.a.action === 'pickup') collectNearby(world);
+    else if (ctx.a.action === 'attack') tryShoot(world);
+  }
+  if (input.actionB) {
+    input.actionB = false;
+    if (car) honkHorn(world);
+    // On foot B fires the current weapon: a tap (F key) is one shot
+    // (shootPulse only), a held touch button keeps firing — input.shoot
+    // stays up while the finger is down (see attachTouch in input.js).
+    else { input.shoot = !!input.bHeld; input.shootPulse = true; }
+  }
+  if (input.horn) {
+    input.horn = false;
+    if (car) honkHorn(world);
+  }
   if (input.enterCar) {
     if (car) exitCar(world);
     else {
@@ -685,6 +1019,38 @@ export function update(world, input, dt) {
     if (!world.mission.active) {
       const d = dist2(p.x, p.z, city.hideout.x, city.hideout.z);
       if (d < 100) startMission(world);
+    }
+  }
+  // MISI button (touch): it ALWAYS answers. The old button only pulsed
+  // interact, which does nothing away from the hideout — and missions
+  // auto-start in the same radius anyway, so across most of the map the
+  // tap was dead silence. Now: near the hideout the tap itself starts
+  // the mission (from further out than the auto-start radius); far away
+  // it shows the objective, the distance and sets a waypoint to it.
+  if (input.missionTap) {
+    input.missionTap = false;
+    const def = missionDef(world);
+    const px = car ? car.x : p.x;
+    const pz = car ? car.z : p.z;
+    if (def && !world.mission.active) {
+      const d = Math.hypot(px - city.hideout.x, pz - city.hideout.z);
+      if (d < 25) {
+        startMission(world);
+      } else {
+        world.waypoint = { x: city.hideout.x, z: city.hideout.z };
+        showMessage(world, 'MISSION ' + (world.mission.index + 1) + '/8 · ' + def.name + ': go to the hideout — ' + Math.round(d) + ' m. Waypoint set.', 4);
+      }
+    } else if (def && world.mission.active) {
+      const t = missionTarget(world);
+      if (t) {
+        const d = Math.hypot(px - t.x, pz - t.z);
+        world.waypoint = { x: t.x, z: t.z };
+        showMessage(world, missionObjectiveText(world) + ' — ' + (t.label || 'target') + ' ' + Math.round(d) + ' m. Waypoint set.', 4);
+      } else {
+        showMessage(world, missionObjectiveText(world), 3);
+      }
+    } else {
+      showMessage(world, 'All missions complete — Kota Seja is yours, Rico.', 3);
     }
   }
 
@@ -933,6 +1299,9 @@ export function serialize(world) {
     money: world.money, respect: world.respect, debtPaid: world.debtPaid,
     day: world.day, clockHours: world.clockHours,
     missionIndex: world.mission.index,
+    // Round 7 — the Halcyon settings ride along with the save: camera
+    // mode, radio station and headlight mode survive a quit/reload.
+    settings: world.settings,
     player: { x: world.player.x, z: world.player.z, health: world.player.health, armour: world.player.armour, weapon: world.player.weapon, owned: world.player.owned, ammo: world.player.ammo, reserve: world.player.reserve },
     stats: world.stats,
     collectibles: world.city.collectibles.filter((c) => c.taken).map((c) => c.id),
@@ -948,6 +1317,13 @@ export function deserialize(world, json) {
     world.day = s.day ?? 1;
     world.clockHours = s.clockHours ?? CONFIG.dayStartHours;
     world.mission.index = s.missionIndex ?? 0;
+    // Round 7 — restore settings, but only values the game knows:
+    // a hand-edited or older save must never smuggle in a bad mode.
+    if (s.settings && typeof s.settings === 'object') {
+      if (CONFIG.camModes.includes(s.settings.camMode)) world.settings.camMode = s.settings.camMode;
+      if (Number.isInteger(s.settings.station) && s.settings.station >= 0 && s.settings.station < CONFIG.radioStations.length) world.settings.station = s.settings.station;
+      if (CONFIG.lightsModes.includes(s.settings.lights)) world.settings.lights = s.settings.lights;
+    }
     if (s.player) {
       Object.assign(world.player, {
         x: s.player.x, z: s.player.z, health: s.player.health,
@@ -969,3 +1345,9 @@ export function deserialize(world, json) {
     return false;
   }
 }
+
+// Round 7 complete (2026-11-19): Halcyon contextual A/B (MASUK /
+// KELUAR / AMBIL / MULAI / SERANG + TEMBAK / PUKUL / KLAKSON), horn
+// with pedestrian reaction, full day/night phase + auto headlights,
+// saved settings (camera / station / lights), NPC variety
+// (hair, pants, accessories, height). Unit tests in tests-r7.

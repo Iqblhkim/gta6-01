@@ -3,7 +3,14 @@
 // the game straight into a composed scene so the screenshots show the
 // city, the HUD, the minimap and a mission at once. This only ever runs
 // when the page is opened with a ?shot= query; normal play is untouched.
+// Round 7 (2026-11-19): the scenes now prove the round-7 features
+// too — the start scene is a bright MORNING (07:30) so the new
+// day/night cycle, the thin zebra crossings and the sidewalks read
+// clearly, and the drive scene is at NIGHT (21:00) with the
+// headlights on, neon lit and stars out, so the night lighting,
+// headlight pools and the landmark tower show in 2-drive.jpg.
 import { startMission, enterCar, addWanted, spawnPolice } from './world.js';
+import { dayPhaseAt } from './config.js';
 
 export const SHOT_SCENES = ['start', 'drive', 'chase', 'mission'];
 
@@ -12,7 +19,11 @@ export function applyShot(world, name) {
   const p = world.player;
   world.screen = 'playing';
   if (name === 'start') {
-    // Rico on foot by the hideout at sunset, a taxi rolling past.
+    // Rico on foot by the hideout in the morning, a taxi rolling past.
+    // Round 7: morning (07:30) — bright sky, thin zebra crossings and
+    // sidewalks visible at the intersection behind him.
+    world.clockHours = 7.5;
+    world.dayPhase = dayPhaseAt(world.clockHours);
     p.x = city.hideout.x + 4; p.z = city.hideout.z + 14;
     p.angle = Math.PI * 0.9;
     world.cameraYaw = Math.PI * 1.05;
@@ -24,6 +35,12 @@ export function applyShot(world, name) {
     world.radioTimer = 30;
   } else if (name === 'drive') {
     // Rico driving a red sport car east along the beachfront road.
+    // Round 7: NIGHT (21:00) with the headlights on — neon, stars,
+    // lit windows and the headlight pools ahead of the car, plus the
+    // landmark tower on the skyline, all in 2-drive.jpg.
+    world.clockHours = 21;
+    world.dayPhase = dayPhaseAt(world.clockHours);
+    world.settings.lights = 'on';
     const car = world.cars.find((c) => c.model === 'sport') ?? world.cars[0];
     car.x = -26; car.z = 130; car.angle = Math.PI / 2; car.speed = 18;
     car.color = '#d94f3d';
@@ -89,3 +106,8 @@ export function applyShot(world, name) {
     }
   }
 }
+
+// Round 7 complete (2026-11-19): start scene at 07:30 (morning) and
+// drive scene at 21:00 with headlights on (night) — the new
+// day/night cycle, zebra, sidewalks, neon and headlights show in the
+// screenshots. Scenes unchanged otherwise (start/drive/chase/mission).
