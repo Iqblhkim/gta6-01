@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
 <meta name="color-scheme" content="dark"/>
 <link rel="icon" href="data:,"/>
-<title>Kota Seja 3D — Halcyon Edition</title>
+<title>Kota Seja — Golden Hour Pursuit | 3D open-world crime</title>
 
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -221,7 +221,7 @@ select,input[type=range]{accent-color:#ff2e88}
     <div class="logoWrap">
       <p class="logoScript">Welcome to</p>
       <h1 class="logo">KOTA SEJA</h1>
-      <div class="logoSub">Halcyon Edition • Sunset City • Est. 1986</div>
+      <div class="logoSub">Golden Hour Pursuit • 5 story chapters • Police dispatch &amp; roadblocks • Carjacking • Garage • Radio</div>
     </div>
     <aside class="howto" id="howtoPanel"><div class="howtoScroll" id="howtoScroll"><b>HOW TO PLAY</b><br>🕹️ Joystick kiri — jalan / setir<br>👉 Seret layar — putar kamera 360° • Panah ←/→ putar kamera<br><b>A</b> — lari / gas &nbsp; <b>B</b> — masuk mobil / serang<br>🚗 Dekati mobil lalu tekan <b>MASUK</b> · 🛒 <b>TOKO SEJA</b> ($) · 🏠 <b>RUMAH</b> bisa dimasuki<br>⭐ Hindari polisi, selesaikan misi, kumpulkan uang.<br><span style="opacity:.8">Detail lengkap: tombol <b>CONTROLS</b> di menu ↓</span></div><div class="howtoHint" id="howtoHint" aria-hidden="true">Gulir ▾ masih ada di bawah</div></aside>
   </div>
@@ -245,20 +245,25 @@ select,input[type=range]{accent-color:#ff2e88}
 <!-- HUD -->
 <div id="hud">
   <div class="hudTop">
-    <div class="pillRow"><span class="pill">💰 $<span id="money">250</span></span><span class="pill">❤️ <span id="health">100</span>%</span><span class="pill">🔫 <span id="weapon">Tinju</span></span><span class="pill">💊 <span id="medkitN">0</span></span><span class="pill" id="carPill" style="display:none">🚗 <span id="carHp">100</span>% ⛽ <span id="carFuel">100</span>%</span><span class="pill" id="clock">17:40</span></div>
-    <div id="stars">☆☆☆☆☆</div>
+    <div class="pillRow"><span class="pill">💰 $<span id="money">250</span></span><span class="pill">❤️ <span id="health">100</span>%</span><span class="pill">🔫 <span id="weapon">Fists</span></span><span class="pill">💊 <span id="medkitN">0</span></span><span class="pill" id="carPill" style="display:none">🚗 <span id="carHp">100</span>% ⛽ <span id="carFuel">100</span>%</span><span class="pill" id="clock">17:40</span><span class="pill" id="radioPill">♪ SEJA FM</span></div>
+    <div id="rankWrap" style="display:none"><div id="rankName">RANK 1 · ROOKIE</div><div id="rankBar"><div id="rankFill"></div></div><div id="rankRp">0 / 1,000 RP</div></div>
+    <div id="wantedWrap"><span id="wantedLabel" style="display:none">WANTED</span><div id="stars">☆☆☆☆☆</div></div>
   </div>
+  <div id="weaponSlots" style="display:none"></div>
   <div class="hudMid">
-    <div id="missionBox"><b>BAB 1 — SAMBUTAN HANGAT</b><br><span id="missionText">Pergi ke dermaga — paketnya di trotoar depan gedung biru dekat dermaga. Dekati paketnya atau tekan B di dekat paket untuk mengambilnya.</span><div id="storyLine">📖 CERITA 0/5 • 🎯 Sampingan: 0</div><div id="missionTimer"></div><div id="missionHint"></div><div id="sideInfo"></div></div>
+    <div id="missionBox"><b>CH. 1 — WARM WELCOME</b><br><span id="missionText">Go to the harbour — the package is on the pavement in front of the blue building near the docks. Walk up to it or press B near it to pick it up.</span><div id="storyLine">📖 STORY 0/5 • 🎯 Side: 0</div><div id="missionTimer"></div><div id="missionHint"></div><div id="sideInfo"></div></div>
     <div class="hudRail">
       <div id="minimapWrap"><canvas id="minimap" width="184" height="184"></canvas></div>
       <div class="railBtns"><button id="btnPause" aria-label="Pause">⏸️</button><button id="btnMapTop" aria-label="Peta">🗺️</button></div>
       <div class="railBtns"><button id="btnSideTop" aria-label="Misi Sampingan" style="display:none">🎯</button></div>
     </div>
   </div>
+  <div id="dispatchPanel" style="display:none"><div id="dispatchHead"><span>🚔 POLICE RESPONSE</span><span id="dispatchCount">0 UNITS</span></div><div id="dispatchRows"></div><div id="dispatchFoot">IN SIGHT</div></div>
+  <div id="speedCluster" style="display:none"><div id="speedNum"><span id="speedVal">0</span><span id="speedUnit"> KM/H</span></div><div id="carNameLine"><span id="carName">SEJA GT</span><span id="carCond">CONDITION 100%</span></div><div id="carCondBar"><div id="carCondFill"></div></div><div id="radioLine">♪ SEJA FM — Funk 98.1</div></div>
   <div id="centerMsg"></div><div id="radioToast">📻 SEJA FM</div>
 </div>
 
+<div id="shotDialog"><div id="shotAvatar">👮</div><div id="shotBody"><div id="shotName">CAPT. VANCE · DISPATCH</div><div id="shotText">…</div></div></div>
 <div id="dialogBox" role="dialog" aria-label="Dialog"><div id="dialogName">INFORMAN</div><div id="dialogText">…</div><button id="btnDialogNext" type="button">LANJUT ▶</button></div>
 <!-- TOUCH CONTROLS -->
 <div id="touch">
@@ -266,12 +271,12 @@ select,input[type=range]{accent-color:#ff2e88}
   <div id="joyBase"><div id="joyKnob">●</div></div>
   <div class="miniBtns"><button id="btnRadio" aria-label="Radio">📻</button><button id="btnCam" aria-label="Kamera">📷</button><button id="btnWeapon" aria-label="Senjata">👊</button><button id="btnMedkit" aria-label="Pakai medkit">💊</button></div>
   <div class="abWrap">
-    <button class="abBtn" id="btnRev"><span>⏪</span><small>MUNDUR</small></button>
-    <button class="abBtn" id="btnB"><span id="icoB">🚗</span><small id="labB">MASUK</small></button>
-    <button class="abBtn" id="btnA"><span id="icoA">🏃</span><small id="labA">LARI</small></button>
+    <button class="abBtn" id="btnRev"><span>⏪</span><small>REVERSE</small></button>
+    <button class="abBtn" id="btnB"><span id="icoB">🚗</span><small id="labB">ENTER</small></button>
+    <button class="abBtn" id="btnA"><span id="icoA">🏃</span><small id="labA">RUN</small></button>
   </div>
-  <button id="btnExit"><span>🚪</span><small>KELUAR</small></button>
-  <button id="btnShopFloat"><span>🛒</span><small>TOKO</small></button>
+  <button id="btnExit"><span>🚪</span><small>EXIT</small></button>
+  <button id="btnShopFloat"><span>🛒</span><small>SHOP</small></button>
   <button id="btnHouseFloat"><span>🏠</span><small>MASUK</small></button>
 </div>
 
@@ -306,13 +311,75 @@ select,input[type=range]{accent-color:#ff2e88}
 #taxiInfo{display:none;margin-top:6px;background:rgba(0,229,255,.12);border:1px solid rgba(0,229,255,.55);color:#c8f6ff;border-radius:8px;padding:6px 8px;font-weight:700;font-size:12.5px}
 #taxiInfo.on{display:block}
 /* MODE FOTO: semua HUD + kontrol sentuh disembunyikan, hanya bar foto yang tampil. */
-body.photo #hud,body.photo #touch,body.photo #dialogBox,body.photo #radioToast,body.photo #centerMsg{display:none!important}
+body.photo #hud,body.photo #touch,body.photo #dialogBox,body.photo #shotDialog,body.photo #radioToast,body.photo #centerMsg{display:none!important}
 #photoBar{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + var(--sab));z-index:40;gap:8px;background:rgba(10,6,24,.85);border:1px solid rgba(255,209,102,.5);border-radius:999px;padding:8px 10px;align-items:center}
 body.photo #photoBar{display:flex}
 #photoBar span{font-weight:800;font-size:12.5px;color:#ffe9a8;white-space:nowrap}
 #photoBar button{min-height:44px;border:0;border-radius:999px;padding:8px 14px;font-weight:900;font-size:13px;cursor:pointer}
 #btnPhotoSnap{background:#ffd166;color:#231400}
 #btnPhotoExit{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.35)}
+</style>
+<!-- Round 14 additions: dispatch HUD + speedometer + weapon slots + rank + shot dialogue (top-5 pattern). -->
+<style>
+/* R14: kotak misi lebih ramping (dulu membentang penuh) supaya panel dispatch punya ruang di bawahnya. */
+#missionBox{max-width:440px}
+/* R14: bar atas rata atas — rank 3 baris tidak boleh meluber menutupi baris slot senjata. */
+#hud .hudTop{align-items:flex-start}
+/* R14: minimap lebih besar (70 -> 110px) seperti entri top-5. */
+#minimapWrap{width:110px;height:110px}
+#wantedWrap{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:0 0 auto}
+#wantedLabel{font-size:11px;font-weight:900;letter-spacing:.22em;color:#ffd166;text-shadow:0 0 10px rgba(255,209,102,.8)}
+#rankWrap{display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-left:auto;min-width:120px}
+#rankName{font-size:12px;font-weight:900;letter-spacing:.08em;color:#7ef0c1;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+#rankBar{width:120px;height:5px;background:rgba(255,255,255,.22);border-radius:99px;overflow:hidden}
+#rankFill{height:100%;width:0%;background:#7ef0c1;border-radius:99px}
+#rankRp{font-size:10px;font-weight:800;color:rgba(255,255,255,.85);letter-spacing:.05em}
+/* R14: baris slot senjata bernomor (1-5), di bawah bar atas, rata kanan. */
+#weaponSlots{display:flex;gap:6px;justify-content:flex-end;margin-top:10px}
+.wslot{width:52px;background:rgba(10,6,24,.82);border:1px solid rgba(255,255,255,.35);border-radius:9px;padding:5px 2px 4px;text-align:center;position:relative}
+.wslot .wnum{position:absolute;top:2px;left:5px;font-size:9px;font-weight:900;color:#ffd166}
+.wslot .wico{font-size:17px;line-height:1.15;display:block}
+.wslot .wname{font-size:8.5px;font-weight:900;letter-spacing:.04em;color:#fff;display:block;margin-top:1px}
+.wslot .wammo{font-size:9px;font-weight:800;color:#7ef0c1;display:block}
+.wslot.cur{border-color:#ffd166;box-shadow:0 0 0 1px #ffd166,0 0 12px rgba(255,209,102,.5);background:rgba(60,40,0,.85)}
+.wslot.locked{opacity:.45}
+.wslot.locked .wammo{color:#ff8fa3}
+/* R14: panel dispatch polisi — di bawah kotak misi, kiri. */
+#dispatchPanel{width:min(340px,78vw);background:rgba(10,6,24,.85);border:1px solid rgba(255,255,255,.28);border-left:4px solid #4da3ff;border-radius:10px;padding:8px 10px;margin-top:10px;font-size:12px;line-height:1.45}
+#dispatchHead{display:flex;justify-content:space-between;font-weight:900;letter-spacing:.1em;color:#cfe6ff;font-size:11.5px;margin-bottom:5px}
+#dispatchCount{color:#ffd166}
+.drow{display:flex;align-items:center;gap:6px;padding:2px 0}
+.drow .dname{font-weight:900;letter-spacing:.04em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dchip{font-size:9.5px;font-weight:900;letter-spacing:.06em;padding:2px 6px;border-radius:5px;white-space:nowrap}
+.dchip.RAMMING{background:#ff3b30;color:#fff}.dchip.PURSUIT{background:#ff9500;color:#fff}
+.dchip.SPOTLIGHT{background:#0a84ff;color:#fff}.dchip.ROADBLOCK{background:#ffd60a;color:#231400}
+.dchip.FLANKING{background:#bf5af2;color:#fff}.dchip.FIRING{background:#ff375f;color:#fff}
+.drow .ddist{font-weight:900;color:#ffd166;min-width:42px;text-align:right}
+#dispatchFoot{margin-top:5px;font-size:10px;font-weight:900;letter-spacing:.14em;color:#7ef0c1}
+/* R14: klaster speedometer — kanan bawah, di atas tombol sentuh. */
+#speedCluster{position:fixed;right:calc(16px + var(--sar));bottom:calc(215px + var(--sab));z-index:15;text-align:right;pointer-events:none}
+#speedNum{font-family:"Bebas Neue","Arial Narrow",Impact,sans-serif;font-size:54px;line-height:.95;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.75)}
+#speedUnit{font-size:16px;letter-spacing:.12em;color:#ffd166}
+#carNameLine{display:flex;justify-content:flex-end;gap:8px;font-size:12.5px;font-weight:900;letter-spacing:.06em;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.7)}
+#carCond{color:#7ef0c1}
+#carCondBar{width:180px;height:6px;background:rgba(255,255,255,.22);border-radius:99px;overflow:hidden;margin:3px 0 3px auto}
+#carCondFill{height:100%;width:100%;background:#7ef0c1;border-radius:99px}
+#radioLine{font-size:12px;font-weight:800;color:#7ef0c1;text-shadow:0 1px 6px rgba(0,0,0,.7)}
+/* R14: dialog staged-shot (portrait + nama + teks), mirip #dialogBox tapi tanpa tombol & tanpa pause. */
+#shotDialog{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(168px + var(--sab));z-index:28;width:min(92vw,520px);background:rgba(10,6,24,.94);border:1px solid rgba(255,209,102,.6);border-left:5px solid #ffd166;border-radius:14px;padding:12px 14px;display:none;box-shadow:0 14px 40px rgba(0,0,0,.5);gap:12px;align-items:flex-start}
+#shotDialog.on{display:flex}
+#shotAvatar{flex:0 0 auto;width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,#4361ee,#7b2ff7);display:flex;align-items:center;justify-content:center;font-size:28px}
+#shotBody{min-width:0}
+#shotName{color:#ffd166;font-weight:900;letter-spacing:.08em;font-size:12px;margin-bottom:4px}
+#shotText{font-size:14.5px;line-height:1.55}
+@media(max-width:700px){
+ #missionBox{max-width:none}
+ #minimapWrap{width:70px;height:70px}
+ #rankWrap{min-width:90px}#rankBar{width:90px}
+ .wslot{width:44px}
+ #speedCluster{bottom:calc(315px + var(--sab))}
+ #speedNum{font-size:42px}
+}
 </style>
 <div id="photoBar"><span>📸 MODE FOTO — layar bersih, tekan P / ✕ untuk keluar</span><button id="btnPhotoSnap" type="button">📸 AMBIL FOTO</button><button id="btnPhotoExit" type="button">✕ KELUAR</button></div>
 <script src="vendor/three.min.js"></script>
