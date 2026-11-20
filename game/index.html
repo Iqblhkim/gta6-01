@@ -28,7 +28,7 @@ canvas{display:block}
 #menu::-webkit-scrollbar{width:8px}
 #menu::-webkit-scrollbar-thumb{background:rgba(255,209,102,.45);border-radius:99px}
 #menu::-webkit-scrollbar-track{background:transparent}
-.topRow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.topRow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:12px} /* R12: judul & howto boleh membungkus di layar sempit — tidak menumpuk */
 .logoWrap{text-align:left}
 .logoScript{font-family:Pacifico,"Segoe Script",cursive;color:#ffd166;font-size:clamp(18px,3.5vw,28px);text-shadow:0 2px 18px #ff6b35;margin:0;line-height:1}
 .logo{font-family:"Bebas Neue","Arial Narrow",Impact,sans-serif;font-size:clamp(52px,11vw,110px);line-height:.85;letter-spacing:.04em;margin:2px 0;background:linear-gradient(180deg,#ffe66d 0%,#ff9e00 38%,#ff2e88 72%,#7b2ff7 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 0 #2b0a4a) drop-shadow(0 0 22px rgba(255,110,64,.85))}
@@ -168,7 +168,7 @@ select,input[type=range]{accent-color:#ff2e88}
 #btnTutSkip{flex:0 0 100px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.3)}
 /* ROUND 10 — BANNER PERFORMA: kecil di sudut kanan atas (di bawah rel minimap), tidak memblokir
    pandangan & joystick; game tetap jalan saat banner tampil. */
-#perfBanner{display:none;position:fixed;top:calc(230px + var(--sat));right:calc(12px + var(--sar));z-index:18;width:min(250px,64vw);background:rgba(10,6,24,.92);border:1px solid rgba(255,209,102,.55);border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+#perfBanner{display:none;position:fixed;top:calc(230px + var(--sat));left:calc(12px + var(--sal));z-index:18;width:min(250px,64vw);background:rgba(10,6,24,.92);border:1px solid rgba(255,209,102,.55);border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5;box-shadow:0 14px 40px rgba(0,0,0,.5)} /* R12: banner performa di KIRI (dulu kanan) — tidak pernah menutupi minimap & tombol Pause/Peta */
 #perfBanner.on{display:block}
 #perfBanner .perfBtns{display:flex;gap:8px;margin-top:8px}
 #perfBanner .perfBtns button{flex:1;min-height:38px;border:0;border-radius:10px;font-weight:900;font-size:12.5px;cursor:pointer}
@@ -249,7 +249,7 @@ select,input[type=range]{accent-color:#ff2e88}
     <div id="stars">☆☆☆☆☆</div>
   </div>
   <div class="hudMid">
-    <div id="missionBox"><b>BAB 1 — SAMBUTAN HANGAT</b><br><span id="missionText">Pergi ke penanda merah di dekat dermaga. Ambil paketnya.</span><div id="storyLine">📖 CERITA 0/5 • 🎯 Sampingan: 0</div><div id="missionTimer"></div><div id="missionHint"></div><div id="sideInfo"></div></div>
+    <div id="missionBox"><b>BAB 1 — SAMBUTAN HANGAT</b><br><span id="missionText">Pergi ke dermaga — paketnya di trotoar depan gedung biru dekat dermaga. Dekati paketnya atau tekan B di dekat paket untuk mengambilnya.</span><div id="storyLine">📖 CERITA 0/5 • 🎯 Sampingan: 0</div><div id="missionTimer"></div><div id="missionHint"></div><div id="sideInfo"></div></div>
     <div class="hudRail">
       <div id="minimapWrap"><canvas id="minimap" width="184" height="184"></canvas></div>
       <div class="railBtns"><button id="btnPause" aria-label="Pause">⏸️</button><button id="btnMapTop" aria-label="Peta">🗺️</button></div>
@@ -285,7 +285,7 @@ select,input[type=range]{accent-color:#ff2e88}
 <label class="row">Getaran (HP) <select id="setVib"><option value="on">Nyala</option><option value="off">Mati</option></select></label>
 <label class="row">Auto-aim <select id="setAutoAim"><option value="on">Nyala</option><option value="off">Mati</option></select></label>
 <br><button data-close>SIMPAN &amp; TUTUP</button></div></div>
-<div class="modal" id="modalMap"><div class="card"><h2>Peta Kota Seja</h2><canvas id="bigMapCanvas" width="640" height="640"></canvas><p style="font-size:13px;line-height:1.6">🔴 Misi &nbsp; 🔵 Kamu &nbsp; 💲 Toko Seja ($) &nbsp; 🔧 Bengkel Seja (B) — perbaiki mobil &amp; isi bensin &nbsp; ⛽ SPBU Seja (+) — bensin &amp; medkit &nbsp; ✚ Medkit &nbsp; 💵 Uang &nbsp; 🟢 Taman Senja &nbsp; 🏠 Rumah (bisa dimasuki) &nbsp; Distrik: Pelabuhan (SW) • Neon Strip (SE) • Marina (NW) • Bukit Halcyon (NE)</p><button data-close>TUTUP PETA</button> <button id="btnResume2">LANJUT MAIN</button></div></div>
+<div class="modal" id="modalMap"><div class="card"><h2>Peta Kota Seja</h2><canvas id="bigMapCanvas" width="640" height="640"></canvas><p style="font-size:13px;line-height:1.6">🔴 Misi &nbsp; 🔵 Kamu &nbsp; 💲 Toko Seja ($) &nbsp; 🔧 Bengkel Seja (B) — perbaiki mobil &amp; isi bensin &nbsp; ⛽ SPBU Seja (+) — bensin &amp; medkit &nbsp; ✚ Medkit &nbsp; 💵 Uang &nbsp; 🟢 Taman Senja &nbsp; 🏠 Rumah (bisa dimasuki) &nbsp; 🟦 Polisi (kotak biru) &nbsp; ⭕ Heli polisi (lingkaran biru) &nbsp; 🔵 Danau (lingkaran biru besar) &nbsp; Distrik: Pelabuhan (SW) • Neon Strip (SE) • Marina (NW) • Bukit Halcyon (NE)</p><button data-close>TUTUP PETA</button> <button id="btnResume2">LANJUT MAIN</button></div></div>
 <div class="modal" id="modalPause"><div class="card"><h2>Paused</h2><p id="pauseStats" style="line-height:1.7"></p><button id="btnResume">▶ LANJUT</button> <button id="btnShop">🛒 TOKO</button> <button id="btnSide">🎯 MISI SAMPINGAN</button> <button id="btnToMap">🗺️ PETA</button> <button id="btnShowDebug" type="button">🛠 Diagnosa</button> <button id="btnToMenu">MENU UTAMA</button></div></div>
 <div id="perfBanner"><span id="perfText"></span><div class="perfBtns"><button id="btnPerfYes" type="button">⚡ HEMAT</button><button id="btnPerfNo" type="button">TUTUP</button></div></div>
 <div id="tutCard"><div id="tutStepLabel">Langkah 1 dari 5</div><div id="tutIcon">🕹️</div><h2 id="tutTitle" style="font-size:20px">Bergerak</h2><p id="tutText"></p><div id="tutDots">●○○○○</div><div class="tutBtns"><button id="btnTutSkip" type="button">LEWATI</button><button id="btnTutNext" type="button">LANJUT ▶</button></div></div>
