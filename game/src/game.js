@@ -997,9 +997,9 @@ buildInterior();
 /* INPUT */
 var keys={}, joy={x:0,y:0,id:null}, btnA=false, btnB=false, btnRevHeld=false;
 /* TAHAP 5 — KEYBOARD PC LENGKAP: E masuk/keluar mobil • F serang (tahan = terus, SMG otomatis) •
-   Q ganti senjata • M peta (toggle) • Esc pause (handler terpisah di bawah) • C kamera • R radio •
+   Q ganti senjata • M peta (toggle) • Esc pause (handler terpisah di bawah) • C reset kamera • R radio •
    H medkit • T toko. Aksi sekali-tekan dijaga e.repeat supaya menahan tombol tidak memicu beruntun. */
-addEventListener("keydown",function(e){ keys[e.code]=true; if(e.repeat) return; if(e.code==="KeyE"){ if(inHouse){ if(atExitDoor()) exitHouseFn(); } else { var nhE=houseDoorNear(); if(nhE) enterHouse(nhE); else tryEnterCar(); } } if(e.code==="KeyC") cycleCam(); if(e.code==="KeyR") cycleRadio(); if(e.code==="KeyM") toggleMap(); if(e.code==="KeyF") attack(); if(e.code==="KeyQ") cycleWeapon(); if(e.code==="KeyH") useMedkit(); if(e.code==="KeyT"&&gameStarted&&!paused){ var nst=nearestShop(); if(nst) openShop(nst.id); } });
+addEventListener("keydown",function(e){ keys[e.code]=true; if(e.repeat) return; if(e.code==="KeyE"){ if(inHouse){ if(atExitDoor()) exitHouseFn(); } else { var nhE=houseDoorNear(); if(nhE) enterHouse(nhE); else tryEnterCar(); } } if(e.code==="KeyC") resetCamBehind(); /* R13: C kini reset kamera ke belakang (ganti kamera tetap via tombol 📷 / setelan) */ if(e.code==="KeyR") cycleRadio(); if(e.code==="KeyM") toggleMap(); if(e.code==="KeyF") attack(); if(e.code==="KeyQ") cycleWeapon(); if(e.code==="KeyH") useMedkit(); if(e.code==="KeyT"&&gameStarted&&!paused){ var nst=nearestShop(); if(nst) openShop(nst.id); } });
 addEventListener("keyup",function(e){ keys[e.code]=false; });
 var joyBase=document.getElementById("joyBase"), joyKnob=document.getElementById("joyKnob");
 function joyMove(e){ var r=joyBase.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2; var dx=e.clientX-cx, dy=e.clientY-cy; var max=44, d=Math.hypot(dx,dy); if(d>max){ dx*=max/d; dy*=max/d; } joy.x=dx/max; joy.y=dy/max; joyKnob.style.transform="translate(calc(-50% + "+dx+"px),calc(-50% + "+dy+"px))"; }
@@ -1010,12 +1010,26 @@ joyBase.addEventListener("pointerup",joyEnd); joyBase.addEventListener("pointerc
 /* LOOK-DRAG 360° — seret jari di area kanan layar memutar kamera mengelilingi karakter.
    camYaw bebas penuh (sin/cos menangani putaran >360°), TIDAK dikunci ke belakang karakter
    dan TIDAK mengejar arah hadap pemain. camPitch lebar (-1,25..1,3 rad): pitch negatif = menengadah ke langit. */
-var camYaw=0, camPitch=0.15, look={id:null,lx:0,ly:0}; /* SPEC 12:51: YAW awal 0 — kamera di SELATAN pemain menghadap UTARA, menyusuri jalan utama x=0 yang diapit gedung warna-warni, palem, mobil & zebra (dulu PI: menghadap selatan ke pantai/lapangan hijau kosong). Pitch tetap 0,15. Tetap bisa diputar bebas. */
+var camYaw=0, camPitch=0.15, look={id:null,lx:0,ly:0,t0:0,sx:0,sy:0,moved:false,lastTap:0} /* R13: t0/sx/sy/moved/lastTap = pelacak tap untuk double-tap reset kamera */; /* SPEC 12:51: YAW awal 0 — kamera di SELATAN pemain menghadap UTARA, menyusuri jalan utama x=0 yang diapit gedung warna-warni, palem, mobil & zebra (dulu PI: menghadap selatan ke pantai/lapangan hijau kosong). Pitch tetap 0,15. Tetap bisa diputar bebas. */
 var lookArea=document.getElementById("lookArea");
-lookArea.addEventListener("pointerdown",function(e){ if(!gameStarted||paused) return; e.preventDefault(); look.id=e.pointerId; look.lx=e.clientX; look.ly=e.clientY; try{ lookArea.setPointerCapture(e.pointerId); }catch(err){} });
-lookArea.addEventListener("pointermove",function(e){ if(e.pointerId!==look.id) return; e.preventDefault(); var dx=e.clientX-look.lx, dy=e.clientY-look.ly; look.lx=e.clientX; look.ly=e.clientY; camYaw+=dx*0.011; /* R12 KAMERA 360°: sensitivitas 0,0055 -> 0,011 (2x) — satu sapuan penuh di HP kini >360° */ camPitch=Math.max(-1.25,Math.min(1.3,camPitch+dy*0.003)); }); /* pitch DIPERLEBAR: dulu mentok 0,08..1,15 rad sehingga kamera tidak bisa menengadah sama sekali. Kini seret ke ATAS = pitch negatif = kamera turun rendah dan mendongak ke langit — helikopter terlihat. */
-function lookEnd(e){ if(e.pointerId===look.id) look.id=null; }
+lookArea.addEventListener("pointerdown",function(e){ if(!gameStarted||paused) return; e.preventDefault(); look.id=e.pointerId; look.lx=e.clientX; look.ly=e.clientY; look.t0=performance.now(); look.sx=e.clientX; look.sy=e.clientY; look.moved=false; /* R13: catat awal sentuhan untuk deteksi tap/double-tap */ try{ lookArea.setPointerCapture(e.pointerId); }catch(err){} });
+lookArea.addEventListener("pointermove",function(e){ if(e.pointerId!==look.id) return; e.preventDefault(); dragToChase(); /* R13: seret di Top-Down langsung pindah ke Chase (mode top tidak bisa diputar) */ if(Math.abs(e.clientX-look.sx)>12||Math.abs(e.clientY-look.sy)>12) look.moved=true; var dx=e.clientX-look.lx, dy=e.clientY-look.ly; look.lx=e.clientX; look.ly=e.clientY; camYaw+=dx*0.011; /* R12 KAMERA 360°: sensitivitas 0,0055 -> 0,011 (2x) — satu sapuan penuh di HP kini >360° */ camPitch=Math.max(-1.25,Math.min(1.3,camPitch+dy*0.003)); }); /* pitch DIPERLEBAR: dulu mentok 0,08..1,15 rad sehingga kamera tidak bisa menengadah sama sekali. Kini seret ke ATAS = pitch negatif = kamera turun rendah dan mendongak ke langit — helikopter terlihat. */
+function lookEnd(e){ if(e.pointerId!==look.id) return; look.id=null; if(e.type==="pointerup"&&!look.moved&&performance.now()-look.t0<250){ var _nt=performance.now(); if(_nt-look.lastTap<350) resetCamBehind(); /* R13: double-tap cepat di area pandang = reset kamera ke belakang */ look.lastTap=_nt; } }
 lookArea.addEventListener("pointerup",lookEnd); lookArea.addEventListener("pointercancel",lookEnd); lookArea.addEventListener("lostpointercapture",lookEnd);
+/* R13 KAMERA HALUS — sudut YANG TERLIHAT vs TARGET: camYaw/camPitch tetap target yang ditulis
+   input (seret / panah / respawn); camYawS/camPitchS adalah sudut kamera yang dipakai render dan
+   mengejar target tiap frame, supaya putaran terasa halus, bukan membentak. Nilai awal = target awal. */
+var camYawS=0, camPitchS=0.15, camZoom=1; /* R13: zoom kamera 0,7..1,5 (tombol +/-), 1 = normal */
+/* R13: snap sudut halus ke target — dipakai reset kamera, supaya kamera tidak mengayun
+   setelah teleport/respawn. (Selisih besar di tempat lain ditangani update per-frame di bawah.) */
+function snapCamSmooth(){ camYawS=camYaw; camPitchS=camPitch; }
+/* R13: seret di mode Top-Down langsung pindah ke Chase Cam — mode top tidak bisa diputar, jadi
+   seretan tidak boleh hilang diam-diam. Dipanggil dari pointermove lookArea. */
+function dragToChase(){ if(camMode!=="top") return; camMode="chase"; var sc3=document.getElementById("setCam"); if(sc3) sc3.value="chase"; if(gameStarted) persistSave(); toast("📷 Chase Cam 3D"); }
+/* R13: reset kamera ke belakang pemain — tombol C (desktop) & double-tap area pandang (sentuh).
+   camYaw = arah hadap + PI menaruh kamera di belakang karakter, menghadap searah gerak (pola yang
+   sama dipakai r9SnapCamera & respawn). Sudut halus ikut di-SNAP supaya langsung diam di tempat. */
+function resetCamBehind(){ if(!gameStarted||paused) return; camYaw=playerAngle+Math.PI; camPitch=0.15; camZoom=1; snapCamSmooth(); toast("📷 Kamera kembali ke belakang"); }
 var bHoldTimer=null, bDownAt=0;
 function bindBtn(id,down,up){ var el=document.getElementById(id); el.addEventListener("pointerdown",function(e){ e.preventDefault(); el.setPointerCapture(e.pointerId); down(); }); el.addEventListener("pointerup",function(e){ e.preventDefault(); up(); }); el.addEventListener("pointercancel",up); }
 bindBtn("btnA",function(){ btnA=true; },function(){ btnA=false; });
@@ -1506,8 +1520,8 @@ function animate(){ requestAnimationFrame(animate); var now=performance.now(), d
  /* PLAYER / CAR */
  var fwdX=0,fwdZ=0;
  if(inCar){
-   var steer=-(joy.x)+(keys["KeyA"]||keys["ArrowLeft"]? .8:0)+(keys["KeyD"]||keys["ArrowRight"]? -.8:0);
-   var gas=(btnA||keys["KeyW"]||keys["ArrowUp"])?1:0; var rev=(btnRevHeld||keys["KeyS"]||keys["ArrowDown"]||joy.y>.45)?.7:0; /* mundur: tombol MUNDUR (tahan) / S / Panah Bawah / joystick ke bawah */
+   var steer=-(joy.x)+(keys["KeyA"]? .8:0)+(keys["KeyD"]? -.8:0); /* R13: panah ←/→ kini memutar kamera, bukan menyetir — setir tetap A/D */
+   var gas=(btnA||keys["KeyW"])?1:0; var rev=(btnRevHeld||keys["KeyS"]||joy.y>.45)?.7:0; /* R13: panah ↑/↓ kini dongak/tunduk kamera, bukan gas/mundur — gas tetap W, mundur tetap S / tombol MUNDUR (tahan) / joystick ke bawah */
    var handbrake=keys["Space"];
    var fuelCap= inCar.userData.fuel>0? (inCar.userData.maxSpd||26) : 4; /* TAHAP 3: bensin habis = mobil hanya bisa merayap */
    if(gas) carSpeed=Math.min(carSpeed+dt*16, inCar.userData.parked?0:fuelCap); else if(rev) carSpeed=Math.max(carSpeed-dt*14,-9); else carSpeed*=Math.pow(.4,dt);
@@ -1569,15 +1583,27 @@ function animate(){ requestAnimationFrame(animate); var now=performance.now(), d
  if(health>0&&health<100&&now-lastHurtAt>6000) health=Math.min(100,health+dt*2.2);
  updatePickups(dt,now); updateDrops(dt,now); updateCarFx(dt,now);
  /* camera */
+ /* R13 KAMERA — PANAH KEYBOARD + DAMPING: panah menulis TARGET (camYaw/camPitch) — ←/→ putar,
+    ↑ dongak (pitch turun) / ↓ tunduk (pitch naik). WASD tetap jalan/setir; panah tidak lagi
+    menyetir (lihat steer/gas/rev). Menu memakai panah untuk navigasi, tapi blok ini hanya jalan
+    saat gameStarted && !paused (cabang menu/pause sudah return di atas). Lalu sudut HALUS
+    (camYawS/camPitchS) mengejar target tiap frame (lerp ~10/dtk); selisih besar langsung SNAP
+    supaya kamera tidak mengayun jauh setelah teleport/respawn/masuk rumah/load save. */
+ if(keys["ArrowLeft"]) camYaw-=dt*2.2; if(keys["ArrowRight"]) camYaw+=dt*2.2;
+ if(keys["ArrowUp"]) camPitch=Math.max(-1.25,Math.min(1.3,camPitch-dt*1.2));
+ if(keys["ArrowDown"]) camPitch=Math.max(-1.25,Math.min(1.3,camPitch+dt*1.2));
+ if(keys["Equal"]) camZoom=Math.min(1.5,camZoom+dt*.5); if(keys["Minus"]) camZoom=Math.max(.7,camZoom-dt*.5); /* R13: +/- zoom kamera (jarak 0,7x..1,5x) */
+ var _dy=camYaw-camYawS; if(_dy>2||_dy<-2) camYawS=camYaw; else camYawS+=_dy*Math.min(1,dt*10);
+ var _dp=camPitch-camPitchS; if(_dp>.8||_dp<-.8) camPitchS=camPitch; else camPitchS+=_dp*Math.min(1,dt*10);
  var fx=inCar?inCar.position.x:player.position.x, fz=inCar?inCar.position.z:player.position.z, fy=inCar?1:1.6;
  if(inHouse){ /* DI DALAM RUMAH: kamera jarak dekat & DIJEPIT tetap di dalam ruangan (tidak menembus dinding/lantai/langit-langit); mode top-down pun diambil dari dalam ruangan */
    if(camMode==="top"){ camera.position.set(fx,INT.y+3.05,fz+2.7); camera.lookAt(fx,INT.y,fz); }
-   else { var iHd=Math.cos(camPitch)*3.6, iY=INT.y+1.5+Math.sin(camPitch)*2, iX=fx+Math.sin(camYaw)*iHd, iZ=fz+Math.cos(camYaw)*iHd; iX=Math.max(INT.x-INT.hw+.45,Math.min(INT.x+INT.hw-.45,iX)); iZ=Math.max(INT.z-INT.hd+.45,Math.min(INT.z+INT.hd-.45,iZ)); iY=Math.max(INT.y+.6,Math.min(INT.y+3.3,iY)); camera.position.lerp(new THREE.Vector3(iX,iY,iZ), look.id!==null?0.4:0.3); camera.lookAt(fx,INT.y+1.5,fz); } }
+   else { var iHd=Math.cos(camPitchS)*3.6, iY=INT.y+1.5+Math.sin(camPitchS)*2, iX=fx+Math.sin(camYawS)*iHd, iZ=fz+Math.cos(camYawS)*iHd; /* R13: kamera dalam rumah memakai sudut HALUS */ iX=Math.max(INT.x-INT.hw+.45,Math.min(INT.x+INT.hw-.45,iX)); iZ=Math.max(INT.z-INT.hd+.45,Math.min(INT.z+INT.hd-.45,iZ)); iY=Math.max(INT.y+.6,Math.min(INT.y+3.3,iY)); camera.position.lerp(new THREE.Vector3(iX,iY,iZ), look.id!==null?0.4:0.3); camera.lookAt(fx,INT.y+1.5,fz); } }
  else if(camMode==="top"){ camera.position.set(fx,52,fz+.01); camera.lookAt(fx,0,fz); }
  else { /* ORBIT BEBAS 360°: posisi kamera hanya dari camYaw/camPitch (look-drag di kanan layar), tidak lagi dihitung dari arah hadap pemain/mobil — kamera tidak terkunci di belakang karakter */
-   var dist=inCar?12:9; var hd=Math.cos(camPitch)*dist, vd=Math.max(.55,Math.sin(camPitch)*dist+1.1); /* SPEC 12:33: jarak kamera sedikit lebih jauh (9 jalan kaki / 12 mobil, dulu 7,5/10,5) supaya jalan, palem & horizon masuk bingkai */
-   var _cd=dist; while(_cd>2.5&&collide(fx+Math.sin(camYaw)*(Math.cos(camPitch)*_cd), fz+Math.cos(camYaw)*(Math.cos(camPitch)*_cd))){ _cd*=.6; } var _hd2=Math.cos(camPitch)*_cd, _vd2=Math.max(.55,Math.sin(camPitch)*_cd+1.1)+(dist-_cd)*.3; if(_cd<=2.5&&collide(fx+Math.sin(camYaw)*_hd2, fz+Math.cos(camYaw)*_hd2)){ _hd2=0; _vd2=9; } /* R12: kamera ditarik mendekat bila posisi yang diinginkan menembus gedung; darurat: tepat di atas pemain */
-   var desired=new THREE.Vector3(fx+Math.sin(camYaw)*_hd2, _vd2, fz+Math.cos(camYaw)*_hd2); camera.position.lerp(desired, look.id!==null?0.35:0.14); var lookY= fy + (camPitch<0? -camPitch*11 : 0); /* pitch negatif: target pandang NAIK ke langit, jadi pandangan benar-benar mendongak dan helikopter masuk bingkai */ camera.lookAt(fx,lookY,fz); camAngle=camYaw; }
+   var dist=(inCar?12:9)*camZoom; var hd=Math.cos(camPitchS)*dist, vd=Math.max(.55,Math.sin(camPitchS)*dist+1.1); /* R13: pakai sudut HALUS; jarak ikut zoom */ /* SPEC 12:33: jarak kamera sedikit lebih jauh (9 jalan kaki / 12 mobil, dulu 7,5/10,5) supaya jalan, palem & horizon masuk bingkai */
+   var _cd=dist; while(_cd>2.5&&collide(fx+Math.sin(camYawS)*(Math.cos(camPitchS)*_cd), fz+Math.cos(camYawS)*(Math.cos(camPitchS)*_cd))){ _cd*=.6; } var _hd2=Math.cos(camPitchS)*_cd, _vd2=Math.max(.55,Math.sin(camPitchS)*_cd+1.1)+(dist-_cd)*.3; if(_cd<=2.5&&collide(fx+Math.sin(camYawS)*_hd2, fz+Math.cos(camYawS)*_hd2)){ _hd2=0; _vd2=9; } /* R13: uji tabrakan kamera memakai sudut HALUS */ /* R12: kamera ditarik mendekat bila posisi yang diinginkan menembus gedung; darurat: tepat di atas pemain */
+   var desired=new THREE.Vector3(fx+Math.sin(camYawS)*_hd2, _vd2, fz+Math.cos(camYawS)*_hd2); camera.position.lerp(desired, look.id!==null?0.35:0.14); var lookY= fy + (camPitchS<0? -camPitchS*11 : 0); /* R13: target pandang dari pitch HALUS */ camera.lookAt(fx,lookY,fz); camAngle=camYawS; }
  updateCombatFx(dt,now); updateABThrottled(now); updateHUD();
  minimapTick+=dt; if(minimapTick>.2){ minimapTick=0; drawMap(document.getElementById("minimap"),.82); } /* R12: minimap 5x/detik (dulu ~8x) — hemat performa */
  saveTick+=dt; if(saveTick>5){ saveTick=0; if(gameStarted&&!paused) persistSave(); } /* autosave 5 detik: reload webview di tengah main tidak lagi menghapus progres */
