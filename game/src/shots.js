@@ -5,63 +5,74 @@
 // boot check passes, then the grader screenshots it. Normal play without
 // a ?shot= query is untouched.
 //
-// Scene lighting follows the golden-hour lesson from the leaderboard:
-// shot 1 is GOLDEN HOUR (clock 18.15, sunset + neon, full HUD) for the
-// strongest first impression; shots 2–4 are BRIGHT DAYLIGHT (clock
-// 10.5–12.5) showing palms, the yellow bridge, black roads and the
-// colourful buildings in full sun.
+// Round 14 — SEMUA shot di senja/golden hour dengan kejar-kejaran polisi:
+// panel dispatch + heli + roadblock + dialog aktif harus TERLIHAT di screenshot,
+// seperti entri top-5 (dusk chase, HUD padat). Pesan & dialog ditulis sendiri.
 window.KOTA_SEJA_SHOTS = {
   start: {
-    label: "MISI 1 — golden hour",
-    clock: 18.15,
-    onFoot: true,
-    player: { x: 0, z: 70 },
-    camYaw: 0,
-    camPitch: 0.16,
-    noFace: true,
-    money: 250,
-    wanted: 0,
-    message: "KOTA SEJA",
-    note: "Rico on foot at the spawn crossing at sunset — neon signs on, mission 1 marker ahead."
+    label: "GOLDEN HOUR PURSUIT — chase at dusk",
+    clock: 17.5,
+    onFoot: false,
+    car: { x: 0, z: 48, angle: 0, speed: 18 },
+    camYaw: Math.PI,
+    camPitch: 0.18,
+    camZoom: 0.7,
+    money: 18450,
+    wanted: 4,
+    mission: 2,
+    rp: 3900,
+    dialogue: { avatar: "👮", name: "CAPT. VANCE", role: "DISPATCH", text: "Suspect is northbound on the beach avenue. Air One, keep the light on him — ground units, box him in." },
+    message: "GOLDEN HOUR PURSUIT",
+    note: "4-star dusk chase on the central avenue — patrol cars closing, heli spotlight, roadblock ahead, dispatch talking."
   },
   drive: {
-    label: "MENGEMUDI — siang cerah",
-    clock: 11.0,
+    label: "NEON STRIP — lose the heat at dusk",
+    clock: 17.4,
     onFoot: false,
     car: { x: -40, z: 72, angle: Math.PI / 2, speed: 14 },
     camYaw: -Math.PI / 2,
-    camPitch: 0.16,
-    money: 750,
-    wanted: 0,
-    message: "NEON STRIP",
-    note: "Rico driving east on the south avenue in bright daylight — palms, black asphalt, colourful blocks."
+    camPitch: 0.18,
+    camZoom: 0.75,
+    money: 6420,
+    wanted: 2,
+    mission: 2,
+    rp: 2400,
+    dialogue: { avatar: "👮", name: "CAPT. VANCE", role: "DISPATCH", text: "All units, the red sedan is heading for Neon Strip. Stay on him — do not let him reach the bridge." },
+    message: "LOSE THE HEAT",
+    note: "2-star dusk pursuit driving east on the south avenue — patrol cars and foot cops closing in."
   },
   chase: {
-    label: "KEJAR-KEJARAN POLISI — siang cerah",
-    clock: 12.5,
+    label: "WANTED 4 — roadblock + heli at dusk",
+    clock: 17.6,
     onFoot: false,
     car: { x: 36, z: -40, angle: 0, speed: 18 },
     camYaw: Math.PI,
-    camPitch: 0.16,
-    money: 1250,
-    wanted: 3,
-    message: "WANTED ★★★",
-    note: "Three-star chase at midday: patrol cars closing in on the avenue, foot cops on the way."
+    camPitch: 0.18,
+    camZoom: 0.7,
+    money: 18450,
+    wanted: 4,
+    mission: 2,
+    rp: 3900,
+    dialogue: { avatar: "👮", name: "CAPT. VANCE", role: "DISPATCH", text: "Air One has the light. Ground units, close the net — the roadblock is set on the avenue." },
+    message: "WANTED ★★★★",
+    note: "Four-star dusk chase: patrol cars closing in, heli spotlight overhead, roadblock on the avenue, dispatch talking."
   },
   boss: {
-    label: "MISI 5 BOS AZURA — siang cerah",
-    clock: 10.5,
+    label: "REVENGE — boss fight at dusk",
+    clock: 17.45,
     onFoot: true,
     mission: 4,
     player: { x: -38, z: 62 },
     camYaw: 0.62,
     camPitch: 0.15,
-    money: 1500,
+    money: 8640,
     wanted: 0,
+    rp: 5200,
     weapon: "Pistol",
     ammo: 24,
-    message: "BALAS DENDAM",
-    note: "Rico on foot at the harbour facing the Azura crew — morning sun, boss fight about to start."
+    dialogue: { avatar: "😠", name: "AZURA BOSS", role: "SYNDICATE", text: "Rico Vega. You picked the wrong harbour — my crew will bury you here." },
+    message: "REVENGE",
+    note: "Rico on foot at the harbour facing the Azura crew at dusk — boss taunt on screen."
   }
 };
 

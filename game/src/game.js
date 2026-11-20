@@ -9,6 +9,10 @@ if(typeof THREE==="undefined"){ lastError="THREE tidak terdefinisi"; }
 var hasSave=false, saveData=null;
 var money=250, health=100, wanted=0, missionIdx=0, weaponIdx=0;
 var weapons=["Tinju","Pisau","Pistol","SMG","Shotgun"];
+/* R14: nama TAMPIL senjata dalam bahasa Inggris (id internal tetap "Tinju" dst — kunci ammo/save tidak berubah). */
+var WEAPON_EN={Tinju:"FISTS",Pisau:"KNIFE",Pistol:"PISTOL",SMG:"SMG",Shotgun:"SHOTGUN"};
+var WEAPON_ICO=["👊","🔪","🔫","💥","💣"];
+function weaponEN(w){ return WEAPON_EN[w]||w; }
 /* TOKO SEJA — katalog & inventaris. Harga diseimbangkan ke hadiah misi ($450/$700/$600/$900/$1500):
    Pisau terjangkau dari uang awal $250, Pistol setelah misi 1, mobil pertama setelah ~2 misi, Sport mendekati akhir cerita. */
 var SHOP_WEAPONS=[
@@ -49,11 +53,11 @@ if(_vibOrig){ try{ navigator.vibrate=function(p){ if(!vibOn) return false; retur
 var autoAim=true, aimTarget=null, aimLockUntil=0, aimFaceTo=null, aimFaceT=0; /* TAHAP 1: auto-aim (toggle di Settings, default NYALA) + target yang sedang dikunci cincin penanda */
 var radios=["SEJA FM — Funk 98.1","NEON WAVE — Synth 101.3","AZURA RADIO — Pantai 88.7","OFF"];
 var missions=[
- {t:"SAMBUTAN HANGAT",d:"Pergi ke dermaga — paketnya di trotoar depan gedung biru dekat dermaga. Dekati paketnya atau tekan B di dekat paket untuk mengambilnya.",x:-52,z:52,r:450},
- {t:"ANTAR CEPAT",d:"Antar paket ke Neon Strip NAIK MOBIL sebelum waktu habis!",x:48,z:42,r:700},
- {t:"KEJAR MENTARI",d:"Wanted 3 bintang! Kabur ke Taman Senja, dan misi hanya selesai bila wanted sudah 0 bintang.",x:-18,z:-54,r:600},
- {t:"UTANG LAMA",d:"Temui informan di Bukit Halcyon, gedung hotel besar.",x:52,z:-52,r:900},
- {t:"BALAS DENDAM",d:"Di pelabuhan: kalahkan 6 anggota Azura, lalu hadapi BOS Azura. Misi selesai saat bos tumbang.",x:-48,z:48,r:1500}
+ {t:"WARM WELCOME",d:"Go to the harbour — the package is on the pavement in front of the blue building near the docks. Walk up to it or press B near it to pick it up.",x:-52,z:52,r:450},
+ {t:"FAST DELIVERY",d:"Deliver the package to Neon Strip BY CAR before time runs out!",x:48,z:42,r:700},
+ {t:"CHASE THE SUN",d:"3-star wanted! Escape to Sunset Park — the mission only ends when wanted is back to 0 stars.",x:-18,z:-54,r:600},
+ {t:"OLD DEBT",d:"Meet the informant in Bukit Halcyon, the big hotel building.",x:52,z:-52,r:900},
+ {t:"REVENGE",d:"At the harbour: take down 6 Azura members, then face the AZURA BOSS. The mission ends when the boss falls.",x:-48,z:48,r:1500}
 ];
 /* R12 — TITIK AWAL MISI & CHECKPOINT: posisi awal tiap misi di dalam kota (dipakai bila posisi
    pemain saat misi dimulai tidak valid). checkpointPos dicatat di setMission() dari posisi pemain
@@ -1068,8 +1072,8 @@ function exitCar(){ if(!inCar) return; if(Math.abs(carSpeed)>2){ toast("Berhenti
  var ex=c.position.x+sx*2.4, ez=c.position.z+sz*2.4; if(collide(ex,ez)){ ex=c.position.x-sx*2.4; ez=c.position.z-sz*2.4; } if(collide(ex,ez)){ ex=c.position.x+Math.sin(a)*3.6; ez=c.position.z+Math.cos(a)*3.6; }
  player.visible=true; player.position.set(ex,0,ez); player.rotation.y=a; headlight.intensity=0; if(navigator.vibrate) navigator.vibrate(50); updateAB(); toast("🚪 Keluar mobil"); }
 function updateAB(){ var icoA=document.getElementById("icoA"),labA=document.getElementById("labA"),icoB=document.getElementById("icoB"),labB=document.getElementById("labB"),bB=document.getElementById("btnB");
- if(inCar){ icoA.textContent="⚡"; labA.textContent="GAS"; icoB.textContent="📯"; labB.textContent="KLAKSON•LAMPU"; bB.classList.remove("dim"); }
- else { icoA.textContent="🏃"; labA.textContent="LARI"; var nc=nearestCar(); if(nc){ icoB.textContent="🚗"; labB.textContent="MASUK"; bB.classList.remove("dim"); } else { var cw=weapons[weaponIdx]; icoB.textContent= isGun(cw)?"🔫":(cw==="Pisau"?"🔪":"👊"); labB.textContent= isGun(cw)?"TEMBAK":(cw==="Pisau"?"TEBAS":"PUKUL"); bB.classList.remove("dim"); } }
+ if(inCar){ icoA.textContent="⚡"; labA.textContent="GAS"; icoB.textContent="📯"; labB.textContent="HORN•LIGHTS"; bB.classList.remove("dim"); }
+ else { icoA.textContent="🏃"; labA.textContent="RUN"; var nc=nearestCar(); if(nc){ icoB.textContent="🚗"; labB.textContent="ENTER"; bB.classList.remove("dim"); } else { var cw=weapons[weaponIdx]; icoB.textContent= isGun(cw)?"🔫":(cw==="Pisau"?"🔪":"👊"); labB.textContent= isGun(cw)?"SHOOT":(cw==="Pisau"?"SLASH":"HIT"); bB.classList.remove("dim"); } }
  var bx=document.getElementById("btnExit"); if(bx) bx.classList.toggle("on", !!inCar); var br=document.getElementById("btnRev"); if(br) br.classList.toggle("on", !!inCar); if(!inCar) btnRevHeld=false; var tc=document.getElementById("touch"); if(tc) tc.classList.toggle("incar", !!inCar); }
 /* ============ TAHAP 2 — COMBAT DASAR ============
    Tinju/Pisau: jarak dekat, busur hadap, cooldown singkat. Pistol/SMG/Shotgun: HITSCAN lurus ke arah
@@ -1138,7 +1142,7 @@ function updateCombatFx(dt,now){ if(atkCd>0) atkCd-=dt;
 document.getElementById("btnB").addEventListener("dblclick",function(e){ e.preventDefault(); });
 /* ============ TOKO SEJA: logika beli / pakai / garasi ============ */
 function isGun(w){ return w==="Pistol"||w==="SMG"||w==="Shotgun"; }
-function refreshWeaponUI(){ var w=weapons[weaponIdx]; document.getElementById("weapon").textContent= isGun(w)? w+" • "+(ammo[w]||0) : w; document.getElementById("btnWeapon").textContent=["👊","🔪","🔫","💥","💣"][weaponIdx]; }
+function refreshWeaponUI(){ var w=weapons[weaponIdx]; document.getElementById("weapon").textContent= isGun(w)? weaponEN(w)+" • "+(ammo[w]||0) : weaponEN(w); document.getElementById("btnWeapon").textContent=WEAPON_ICO[weaponIdx]; }
 function applyOutfit(id){ var o=null; OUTFITS.forEach(function(x){ if(x.id===id) o=x; }); if(!o) o=OUTFITS[0]; currentOutfit=o.id; try{ player.userData.body.material.color.setHex(o.shirt); player.userData.armL.children[0].material.color.setHex(o.shirt); player.userData.armR.children[0].material.color.setHex(o.shirt); player.userData.legL.children[0].material.color.setHex(o.pants); }catch(e){} }
 var garageCars=[];
 var GARAGE_SPOTS=[{x:-4,z:90},{x:-11,z:90},{x:-18,z:90}];
@@ -1282,7 +1286,7 @@ function tutAutoCheck(now){ if(!tutActive||!gameStarted||paused) return; if(miss
  if(adv) tutNext(); }
 document.getElementById("btnTutNext").onclick=function(){ tutNext(); };
 document.getElementById("btnTutSkip").onclick=function(){ initAudio(); endTutorial(); };
-function startGame(cont){ initAudio(); closeModals(); clearToasts(); gameStartAt=performance.now(); perfPromptOpen=false; hidePerfBanner(); /* ROUND 10: sesi baru — jam mulai 30 detik bebas tawaran performa, banner lama disembunyikan */ gameFinished=false; failShowing=false; inHouse=null; hasPackage=false; missionTimer=null; hideDialog(true); hideHint(); cancelSideMission(true); /* TAHAP 4: misi sampingan yang sedang berjalan tidak dibawa lintas sesi/mode */ joy.x=0; joy.y=0; joy.id=null; look.id=null; if(cont&&saveData){ money=saveData.money; missionIdx=Math.min(saveData.missionIdx,missions.length); health=(typeof saveData.health==="number"&&saveData.health>0)?saveData.health:100; wanted=0; applySavedShop(); /* TAHAP 5 (lanjutan): pulihkan jam dalam game, stasiun radio & pengaturan dari save; siapkan pemulihan progres Misi 5 (diterapkan spawnAzura saat setMission berjalan) */ if(typeof saveData.clockT==="number"&&saveData.clockT>=0&&saveData.clockT<24) clockT=saveData.clockT; if(typeof saveData.radioIdx==="number"&&saveData.radioIdx>=0&&saveData.radioIdx<radios.length) radioIdx=saveData.radioIdx|0; if(saveData.settings&&typeof applySettings==="function") applySettings(saveData.settings); m5Restore= (saveData.missionIdx===4&&saveData.m5)? saveData.m5 : null; restoredM5Down= (m5Restore&&typeof m5Restore.down==="number")? m5Restore.down : 0; if(saveData.sideDone){ ["kurir","kilat","balap","buru","buronan"].forEach(function(k){ if(typeof saveData.sideDone[k]==="number") side.done[k]=saveData.sideDone[k]; }); } /* pulihkan inventaris toko: senjata, amunisi, mobil garasi, pakaian */ /* pulihkan POSISI tersimpan; bila titiknya kini tertutup collider, jatuh ke spawn aman */
+function startGame(cont){ initAudio(); closeModals(); clearToasts(); gameStartAt=performance.now(); perfPromptOpen=false; hidePerfBanner(); /* ROUND 10: sesi baru — jam mulai 30 detik bebas tawaran performa, banner lama disembunyikan */ gameFinished=false; failShowing=false; inHouse=null; hasPackage=false; missionTimer=null; hideDialog(true); hideHint(); hideShotDialog(); shotRP=null; shotSpeed=null; /* R14: dialog staged-shot & RP override & kecepatan tampil dibersihkan tiap sesi baru */ cancelSideMission(true); /* TAHAP 4: misi sampingan yang sedang berjalan tidak dibawa lintas sesi/mode */ joy.x=0; joy.y=0; joy.id=null; look.id=null; if(cont&&saveData){ money=saveData.money; missionIdx=Math.min(saveData.missionIdx,missions.length); health=(typeof saveData.health==="number"&&saveData.health>0)?saveData.health:100; wanted=0; applySavedShop(); /* TAHAP 5 (lanjutan): pulihkan jam dalam game, stasiun radio & pengaturan dari save; siapkan pemulihan progres Misi 5 (diterapkan spawnAzura saat setMission berjalan) */ if(typeof saveData.clockT==="number"&&saveData.clockT>=0&&saveData.clockT<24) clockT=saveData.clockT; if(typeof saveData.radioIdx==="number"&&saveData.radioIdx>=0&&saveData.radioIdx<radios.length) radioIdx=saveData.radioIdx|0; if(saveData.settings&&typeof applySettings==="function") applySettings(saveData.settings); m5Restore= (saveData.missionIdx===4&&saveData.m5)? saveData.m5 : null; restoredM5Down= (m5Restore&&typeof m5Restore.down==="number")? m5Restore.down : 0; if(saveData.sideDone){ ["kurir","kilat","balap","buru","buronan"].forEach(function(k){ if(typeof saveData.sideDone[k]==="number") side.done[k]=saveData.sideDone[k]; }); } /* pulihkan inventaris toko: senjata, amunisi, mobil garasi, pakaian */ /* pulihkan POSISI tersimpan; bila titiknya kini tertutup collider, jatuh ke spawn aman */
    if(typeof saveData.x==="number"&&typeof saveData.z==="number"&&Math.abs(saveData.x)<=104&&Math.abs(saveData.z)<=104&&!collide(saveData.x,saveData.z)) player.position.set(saveData.x,0,saveData.z); else player.position.set(0,0,70); camYaw=0; camPitch=0.15; } else { money=250; missionIdx=0; wanted=0; health=100; player.position.set(0,0,70); playerAngle=Math.PI; player.rotation.y=Math.PI; camYaw=0; camPitch=0.15; resetWorldCars(); r9CancelTaxi(true); resetShopState(); side.done={kurir:0,kilat:0,balap:0,buru:0,buronan:0}; m5Restore=null; restoredM5Down=0; clockT=11.5; /* NEW GAME / MAIN LAGI: progres penuh direset, termasuk hitungan misi sampingan; jam kembali ke SIANG 11:30 (SPEC 12:33: New Game mulai 11:00-12:00, kesan awal biru cerah; sore/malam tetap datang saat jam berjalan), sedangkan stasiun radio & pengaturan dipertahankan sebagai preferensi pemain */ }
  gameStarted=true; paused=false; hideDebugOverlay(); document.getElementById("menu").style.display="none"; document.getElementById("hud").classList.add("on"); document.getElementById("touch").classList.add("on"); setMission(); drawMap(document.getElementById("minimap"),.82); centerMsg("KOTA SEJA"); toast("📻 "+radios[radioIdx]); updateAB(); refreshWeaponUI(); persistSave(); r9SnapCamera(); /* ROUND 10: kamera langsung SNAP ke posisi akhirnya (sejajar, menghadap jalan) — tidak lagi meluncur turun dari orbit menu di 1-2 detik pertama */ /* NEW GAME menimpa save lama; CONTINUE menyegarkan cap posisi */ if(cont&&missionIdx===4&&restoredM5Down>0){ var rd5=restoredM5Down; setTimeout(function(){ toast("▶ Lanjut Misi 5: "+rd5+" dari 6 anak buah Azura SUDAH tumbang — progres pertempuran tersimpan, misi TIDAK diulang dari awal."); },2400); } if(!cont&&missionIdx===0) showTutorial(); /* TAHAP 5: tutorial 5 langkah hanya di awal NEW GAME misi 1 */ }
 function findSafeNear(x,z){ if(!collide(x,z)) return {x:x,z:z}; var radii=[4,7,10,13,16]; for(var ri=0;ri<radii.length;ri++){ for(var ai=0;ai<8;ai++){ var a=ai*Math.PI/4, nx=x+Math.sin(a)*radii[ri], nz=z+Math.cos(a)*radii[ri]; if(!collide(nx,nz)) return {x:nx,z:nz}; } } return {x:0,z:70}; }
@@ -1292,8 +1296,8 @@ function spawnInformant(){ var m=missions[3]; informantPos=findSafeNear(m.x,m.z)
 function spawnAzura(){ var m=missions[4]; var offs=[[0,0],[5,3],[-5,2],[3,-5],[-3,-5],[7,-2],[-7,-3]]; for(var i=0;i<6;i++){ var sp=findSafeNear(m.x+offs[i][0],m.z+offs[i][1]); var mesh=makePerson(0x232a35,[0xf2c79b,0xe8b08a,0xd9a066,0xb97a4e,0x8a5a33][i%5],{top:"suit",pants:0x14161c,glasses:0x0a0b0d,emblem:0xffc233,face:"stern",hair:0x0f0c09}); mesh.position.set(sp.x,0,sp.z); scene.add(mesh); var roleI=(i%3===1)?"gun":"melee"; setHandProp(mesh,roleI==="gun"?"gun":"knife"); azura.push({mesh:mesh,hp:36,maxHp:36,isBoss:false,alive:true,atkCd:0,role:roleI,shootCd:1+Math.random()*1.2,kx:0,kz:0,carHitT:0}); } var bp=findSafeNear(m.x+offs[6][0],m.z+offs[6][1]-4); var boss=makePerson(0xb00020,0xe8b08a,{top:"suit",pants:0x2a0d12,necklace:0xffc233,face:"scar",hair:0x0f0c09,hairStyle:"short"}); /* BOS: jas merah tua + kalung emas + bekas luka di wajah (scale 1.3 tetap di baris berikut) */ boss.scale.set(1.3,1.3,1.3); boss.position.set(bp.x,0,bp.z); scene.add(boss); azura.push({mesh:boss,hp:120,maxHp:120,isBoss:true,alive:true,atkCd:0,shootCd:1.2,shots:0,reloadT:0,warnT:0,strafeT:0,strafeDir:1,kx:0,kz:0,carHitT:0}); if(m5Restore){ var dnR=Math.max(0,Math.min(6,m5Restore.down|0)); for(var ri2=0;ri2<dnR;ri2++){ var e2=azura[ri2]; if(e2&&!e2.isBoss&&e2.alive){ e2.alive=false; e2.hp=0; e2.mesh.rotation.x=Math.PI/2; e2.mesh.position.y=.25; } } var bE=azura[azura.length-1]; if(bE&&bE.isBoss){ if(m5Restore.bossDead){ bE.alive=false; bE.hp=0; bE.mesh.rotation.x=Math.PI/2; bE.mesh.position.y=.25; setTimeout(function(){ if(missionIdx===4) completeMission(); },700); } else if(typeof m5Restore.bossHp==="number"&&m5Restore.bossHp>0&&m5Restore.bossHp<120) bE.hp=m5Restore.bossHp; } if(dnR>=6||m5Restore.bossActive) bossActive=true; m5Restore=null; } } /* TAHAP 5 (lanjutan): CONTINUE di tengah Misi 5 — anak buah yang sudah tumbang DIPULIHKAN sebagai tumbang (rebah, HP 0), HP bos & status bos aktif ikut dipulihkan; m5Restore hanya diisi jalur Continue, jadi ULANGI MISI dari checkpoint tetap mulai Misi 5 dari awal seperti sebelumnya */ /* TAHAP 2: 6 anak buah (2 penembak "gun" menjaga jarak, 4 jarak dekat "melee") + bos dengan state tembak/reload/strafe */
 function azuraLeft(){ var n=0; azura.forEach(function(e){ if(e.alive&&!e.isBoss) n++; }); return n; }
 function damageAzura(e,dmg){ e.hp-=dmg; if(e.hp<=0){ e.alive=false; e.mesh.rotation.x=Math.PI/2; e.mesh.position.y=.25; if(AC) beep(140,.3,"sawtooth",.2); if(e.isBoss){ if(warnSprite) warnSprite.visible=false; spawnDrop(e.mesh.position.x,e.mesh.position.z,true); centerMsg("💥 BOS AZURA TUMBANG!"); setTimeout(function(){ var mm=missions[missionIdx]; if(mm&&missionIdx===4) completeMission(); },700); } else { spawnDrop(e.mesh.position.x,e.mesh.position.z,false); var left=azuraLeft(); toast("☠️ Anggota Azura tumbang! Sisa: "+left); if(left===0){ bossActive=true; centerMsg("⚠️ BOS AZURA TURUN TANGAN!"); toast("Bos Azura menyerang — kalahkan dia!"); } refreshMissionText(); } } else { toast((e.isBoss?"👹 Bos Azura":"🥷 Azura")+" HP: "+Math.max(0,Math.ceil(e.hp))); } }
-function refreshMissionText(){ if(missionIdx===4){ var el=document.getElementById("missionText"); if(el) el.textContent= bossActive? "BOS AZURA sudah turun tangan — kalahkan bos untuk menamatkan misi!" : ("Di pelabuhan: kalahkan anggota Azura (sisa "+azuraLeft()+" dari 6), lalu hadapi BOS Azura."); } }
-function setMission(){ var m=missions[missionIdx]; clearMissionObjects(); missionTimer=null; hideHint(); hideDialog(true); if(!m){ document.querySelector("#missionBox b").textContent="SELESAI"; document.getElementById("missionText").textContent="Semua misi utama selesai! Jelajahi kota bebas — misi sampingan tetap tersedia lewat tombol 🎯."; marker.visible=false; updateMissionTimerUI(); return; } document.querySelector("#missionBox b").textContent="BAB "+(missionIdx+1)+" — "+m.t; /* ROUND 10: misi utama bernama BAB di kotak misi (contoh "BAB 1 — SAMBUTAN HANGAT") */ document.getElementById("missionText").textContent=m.d; marker.visible=true; marker.position.set(m.x,9,m.z);
+function refreshMissionText(){ if(missionIdx===4){ var el=document.getElementById("missionText"); if(el) el.textContent= bossActive? "The AZURA BOSS is here — take the boss down to finish the mission!" : ("At the harbour: take down the Azura crew ("+azuraLeft()+" of 6 left), then face the AZURA BOSS."); } }
+function setMission(){ var m=missions[missionIdx]; clearMissionObjects(); missionTimer=null; hideHint(); hideDialog(true); if(!m){ document.querySelector("#missionBox b").textContent="COMPLETE"; document.getElementById("missionText").textContent="All story missions complete! Explore the city freely — side missions are still available from the 🎯 button."; marker.visible=false; updateMissionTimerUI(); return; } document.querySelector("#missionBox b").textContent="CH. "+(missionIdx+1)+" — "+m.t; /* R14: header misi bahasa Inggris ("CH. 1 — WARM WELCOME") */ document.getElementById("missionText").textContent=m.d; marker.visible=true; marker.position.set(m.x,9,m.z);
  if(missionIdx===0){ hasPackage=false; spawnPackage(); if(pkgPos) marker.position.set(pkgPos.x,9,pkgPos.z); }
  else if(missionIdx===1){ hasPackage=true; missionTimer=150; /* R12: timer 90 -> 150 detik — adil untuk cari mobil + antar ke Neon Strip */ }
  else if(missionIdx===2){ wanted=3; toast("⭐⭐⭐ Wanted 3 bintang! Kabur!"); }
@@ -1378,7 +1382,7 @@ function updateDrops(dt,now){ var px=inCar?inCar.position.x:player.position.x, p
 function checkMission(dt,now){ var m=missions[missionIdx]; if(!m||failShowing||dialogueActive) { if(pkgMesh) pkgMesh.rotation.y+=dt*1.4; return; } var px=inCar?inCar.position.x:player.position.x, pz=inCar?inCar.position.z:player.position.z;
  if(missionIdx===0){ if(pkgMesh){ pkgMesh.rotation.y+=dt*1.4; pkgMesh.position.y=.12+Math.sin(now*.004)*.12; if(Math.hypot(px-pkgMesh.position.x,pz-pkgMesh.position.z)<2.3&&!inCar) pickupPackage(); else if(Math.hypot(px-pkgMesh.position.x,pz-pkgMesh.position.z)<4.5&&!inCar) showHint("Tekan B (atau tombol MASUK/PUKUL) untuk mengambil paket 📦"); else hideHint(); } return; }
  if(missionIdx===1){ if(missionTimer!==null){ missionTimer-=dt; updateMissionTimerUI(); if(missionTimer<=0){ showFail("⏱️ Waktu habis! Paket harus diantar NAIK MOBIL ke Neon Strip sebelum timer selesai. Misi 2 diulang dari checkpoint — paket tetap di tanganmu."); return; } } var d1=Math.hypot(px-m.x,pz-m.z); if(!inCar){ showHint(d1<7? "Butuh kendaraan — kamu sudah di tujuan, tapi paket WAJIB diantar naik mobil! Masuk mobil lalu kembali ke penanda." : "Butuh kendaraan — paket ini hanya bisa diantar naik mobil. Masuk mobil terdekat!"); } else hideHint(); if(inCar&&d1<6.5){ hideHint(); missionTimer=null; updateMissionTimerUI(); completeMission(); } return; }
- if(missionIdx===2){ var d2=Math.hypot(px-m.x,pz-m.z); /* TAHAP 4: misi ini TIDAK lagi meluruhkan wanted sendiri — wanted hanya turun lewat aturan umum di updateWanted (polisi kehilangan jejak: jauh + tak terlihat > 6 detik, atau pemain ganti mobil). Peluruhan khusus misi versi lama (dt*.18 bila tak ada polisi < 28) menabrak aturan itu. */ if(d2<8){ if(wanted<0.05){ wanted=0; hideHint(); completeMission(); } else showHint("🌳 Sudah di Taman Senja — tapi wanted masih "+Math.ceil(wanted)+"★. Sembunyi sampai polisi kehilangan jejakmu (jauh + tak terlihat), atau ganti mobil!"); } else if(wanted>0) showHint(hiddenT>1.5? "👀 Polisi mulai kehilangan jejakmu… tetap jauh & tak terlihat supaya wanted turun, lalu ke Taman Senja (penanda merah)!" : "⭐ Wanted "+Math.ceil(wanted)+"★ — wanted hanya turun bila polisi kehilangan jejakmu (jauh + tak terlihat beberapa detik) atau kamu ganti mobil. Menuju Taman Senja (penanda merah)."); else hideHint(); return; }
+ if(missionIdx===2){ var d2=Math.hypot(px-m.x,pz-m.z); /* TAHAP 4: misi ini TIDAK lagi meluruhkan wanted sendiri — wanted hanya turun lewat aturan umum di updateWanted (polisi kehilangan jejak: jauh + tak terlihat > 6 detik, atau pemain ganti mobil). Peluruhan khusus misi versi lama (dt*.18 bila tak ada polisi < 28) menabrak aturan itu. */ if(d2<8){ if(wanted<0.05){ wanted=0; hideHint(); completeMission(); } else showHint("🌳 You're at Sunset Park — but wanted is still "+Math.ceil(wanted)+"★. Hide until the police lose your trail (far + unseen), or switch cars!"); } else if(wanted>0) showHint(hiddenT>1.5? "👀 The police are losing your trail… stay far & unseen so wanted drops, then head to Sunset Park (red marker)!" : "⭐ Wanted "+Math.ceil(wanted)+"★ — wanted only drops when the police lose your trail (far + unseen for a few seconds) or you switch cars. Head to Sunset Park (red marker)."); else hideHint(); return; }
  if(missionIdx===3){ if(informantMesh){ informantMesh.rotation.y=Math.atan2(px-informantMesh.position.x,pz-informantMesh.position.z); idlePose(informantMesh,now); if(Math.hypot(px-informantMesh.position.x,pz-informantMesh.position.z)<3.6&&!inCar) startDialogue(); } return; }
  if(missionIdx===4){ updateAzura(dt); return; } }
 /* completeMission lama digantikan versi Tahap 1 di atas */
@@ -1488,12 +1492,77 @@ function drawMap(cv,scale){ if(!cv) return; try{ /* R12: minimap TIDAK PERNAH di
  g.fillStyle="#00e5ff"; g.beginPath(); g.arc(cx+px*scale,cz+pz*scale,6.5,0,7); g.fill(); g.strokeStyle="#fff"; g.lineWidth=2; g.stroke();
  }catch(e){ return; } }
 function drawBigMap(){ drawMap(document.getElementById("bigMapCanvas"),1.9); var g=document.getElementById("bigMapCanvas").getContext("2d"); g.fillStyle="#fff"; g.font="bold 15px sans-serif"; g.fillText("MARINA",40,50); g.fillText("BUKIT HALCYON",430,50); g.fillText("PELABUHAN",40,600); g.fillText("NEON STRIP",450,600); g.fillText("TAMAN SENJA",270,300); }
-function updateHUD(){ document.getElementById("money").textContent=money; document.getElementById("health").textContent=Math.max(0,Math.round(health)); var s=""; for(var i=0;i<5;i++) s+= i<Math.ceil(wanted)?"★":"☆"; /* R12: bintang DIBULATKAN KE ATAS — wanted 0,5 langsung tampil 1★, sinkron dengan toast "+1★" */ document.getElementById("stars").textContent=s; var wn=weapons[weaponIdx]; document.getElementById("weapon").textContent= isGun(wn)? wn+" • "+(ammo[wn]||0) : wn; var wpill=document.getElementById("weapon").parentNode; if(wpill) wpill.style.color= (isGun(wn)&&(ammo[wn]||0)<=0)? "#ff8fa3" : ""; /* indikator amunisi: pill senjata memerah saat peluru habis */
+function updateHUD(){ document.getElementById("money").textContent=money; document.getElementById("health").textContent=Math.max(0,Math.round(health)); var s=""; for(var i=0;i<5;i++) s+= i<Math.ceil(wanted)?"★":"☆"; /* R12: bintang DIBULATKAN KE ATAS — wanted 0,5 langsung tampil 1★, sinkron dengan toast "+1★" */ document.getElementById("stars").textContent=s; var wl=document.getElementById("wantedLabel"); if(wl) wl.style.display= wanted>=1? "" : "none"; /* R14: label WANTED di samping bintang */
+ var wn=weapons[weaponIdx]; document.getElementById("weapon").textContent= isGun(wn)? weaponEN(wn)+" • "+(ammo[wn]||0) : weaponEN(wn); var wpill=document.getElementById("weapon").parentNode; if(wpill) wpill.style.color= (isGun(wn)&&(ammo[wn]||0)<=0)? "#ff8fa3" : ""; /* indikator amunisi: pill senjata memerah saat peluru habis */
+ var rp=document.getElementById("radioPill"); if(rp) rp.textContent="♪ "+(radios[radioIdx]||"").split(" — ")[0]; /* R14: stasiun radio tampil terus di bar atas */
  var mkn=document.getElementById("medkitN"); if(mkn) mkn.textContent=medkits; var bmk=document.getElementById("btnMedkit"); if(bmk) bmk.textContent= medkits>0? "💊"+medkits : "💊";
- var sl=document.getElementById("storyLine"); if(sl){ var sd=0; if(typeof side!=="undefined"&&side.done){ for(var sdk in side.done) sd+=side.done[sdk]; } sl.textContent="📖 CERITA "+Math.min(5,missionIdx)+"/5 • 🎯 Sampingan: "+sd; } /* ROUND 10: skala cerita di HUD — naik tiap misi utama selesai + hitungan misi sampingan */
+ var sl=document.getElementById("storyLine"); if(sl){ var sd=0; if(typeof side!=="undefined"&&side.done){ for(var sdk in side.done) sd+=side.done[sdk]; } sl.textContent="📖 STORY "+Math.min(5,missionIdx)+"/5 • 🎯 Side: "+sd; } /* ROUND 10: skala cerita di HUD — naik tiap misi utama selesai + hitungan misi sampingan */
  var cp=document.getElementById("carPill"); if(cp){ if(inCar){ cp.style.display=""; document.getElementById("carHp").textContent=Math.max(0,Math.round(inCar.userData.hp)); document.getElementById("carFuel").textContent=Math.max(0,Math.round(inCar.userData.fuel)); cp.style.color= inCar.userData.hp<30? "#ff8fa3" : ""; } else cp.style.display="none"; } /* TAHAP 3: pill health+bensin mobil, hanya saat mengemudi */ }
+/* ============ ROUND 14 — PANEL HUD ALA TOP-5 (dispatch, slot senjata, rank, speedometer) ============
+   Diperbarui 4x/detik dari loop (bukan tiap frame) supaya DOM tidak diaduk terus. */
+var shotRP=null; /* R14: RP tampilan untuk staged shot (null = hitung dari progres nyata) */
+var shotSpeed=null; /* R14: kecepatan tampilan staged shot (KM/H dari sc.car.speed) — mobil staged berhenti, tapi speedometer shot harus tetap membaca kecepatan kejar-kejaran */
+var RANKS=[[0,"ROOKIE"],[1000,"STREET"],[2500,"HUSTLER"],[5000,"FIXER"],[10000,"LEGEND"]];
+function respectRP(){ if(typeof shotRP==="number") return shotRP; var sd=0; if(typeof side!=="undefined"&&side.done){ for(var k in side.done) sd+=side.done[k]; } return missionIdx*1000+sd*250+Math.floor(money/10); }
+var CAR_MODELS=["SEJA GT","NEON COUPE","MARINA SEDAN","HALCYON SPORT","PELABUHAN VAN","SUNSET ROADSTER"];
+function carDisplayName(car){ if(!car) return "SEJA GT"; if(car.userData.garageId){ var def=null; SHOP_CARS.forEach(function(c){ if(c.id===car.userData.garageId) def=c; }); if(def) return def.name.toUpperCase(); } var col=car.userData.origColor||0; return CAR_MODELS[((col>>4)%CAR_MODELS.length+CAR_MODELS.length)%CAR_MODELS.length]; }
+function showShotDialog(d){ var box=document.getElementById("shotDialog"); if(!box||!d) return; document.getElementById("shotAvatar").textContent=d.avatar||"👮"; document.getElementById("shotName").textContent=(d.name||"DISPATCH")+(d.role?" · "+d.role:""); document.getElementById("shotText").textContent=d.text||""; box.classList.add("on"); }
+function hideShotDialog(){ var box=document.getElementById("shotDialog"); if(box) box.classList.remove("on"); }
+function updateHUDPanels(){
+ var rw=document.getElementById("rankWrap"), ws=document.getElementById("weaponSlots"), dp=document.getElementById("dispatchPanel"), sc2=document.getElementById("speedCluster");
+ if(!gameStarted){ if(rw) rw.style.display="none"; if(ws) ws.style.display="none"; if(dp) dp.style.display="none"; if(sc2) sc2.style.display="none"; return; }
+ /* RANK + RP */
+ var rp=respectRP(), ri=0; for(var i=0;i<RANKS.length;i++) if(rp>=RANKS[i][0]) ri=i;
+ var next= ri+1<RANKS.length? RANKS[ri+1][0] : null;
+ if(rw){ rw.style.display=""; document.getElementById("rankName").textContent="RANK "+(ri+1)+" · "+RANKS[ri][1];
+  var pct= next? Math.min(100,Math.round((rp-RANKS[ri][0])/(next-RANKS[ri][0])*100)) : 100;
+  document.getElementById("rankFill").style.width=pct+"%";
+  document.getElementById("rankRp").textContent= rp.toLocaleString("en-US")+" / "+(next? next.toLocaleString("en-US") : "MAX")+" RP"; }
+ /* SLOT SENJATA bernomor */
+ if(ws){ ws.style.display=""; var h=""; for(var wi=0;wi<weapons.length;wi++){ var owned=ownedWeapons[wi], cur=wi===weaponIdx;
+   var ammoTxt= owned? (isGun(weapons[wi])? ((ammo[weapons[wi]]||0)+"") : "∞") : "LOCKED";
+   h+='<div class="wslot'+(cur?" cur":"")+(owned?"":" locked")+'"><span class="wnum">'+(wi+1)+'</span><span class="wico">'+WEAPON_ICO[wi]+'</span><span class="wname">'+weaponEN(weapons[wi])+'</span><span class="wammo">'+ammoTxt+'</span></div>'; }
+  ws.innerHTML=h; }
+ /* PANEL DISPATCH POLISI */
+ if(dp){
+  if(wanted<1){ dp.style.display="none"; }
+  else{
+   dp.style.display="";
+   var px=inCar?inCar.position.x:player.position.x, pz=inCar?inCar.position.z:player.position.z;
+   var units=[];
+   var PNAMES=["KITE-1","MARLIN-3","CORAL-48"];
+   if(typeof police!=="undefined") police.forEach(function(pc,pi){ if(!pc.visible) return; var d=Math.hypot(pc.position.x-px,pc.position.z-pz); units.push({name:PNAMES[pi%PNAMES.length], d:d, role:"PURSUIT"}); });
+   if(typeof footCops!=="undefined") footCops.forEach(function(fc,fi){ if(!fc.active||!fc.mesh.visible) return; var d2=Math.hypot(fc.mesh.position.x-px,fc.mesh.position.z-pz); units.push({name:"FOOT-"+(fi+1), d:d2, role: d2<10? "FIRING":"PURSUIT"}); });
+   if(typeof polHeliOn!=="undefined"&&polHeliOn&&typeof policeHeli!=="undefined"&&policeHeli.g){ var dh=Math.hypot(policeHeli.g.position.x-px,policeHeli.g.position.z-pz); units.push({name:"AIR ONE", d:dh, role:"SPOTLIGHT"}); }
+   if(typeof rbPlaced!=="undefined"&&rbPlaced){ var dr=Math.hypot(rbCx-px,rbCz-pz); units.push({name:"ROADBLOCK", d:dr, role:"ROADBLOCK"}); }
+   units.sort(function(a,b){ return a.d-b.d; });
+   /* peran patroli: paling dekat RAMMING, jauh (>50 m) FLANKING, sisanya PURSUIT */
+   var patrolSeen=0;
+   units.forEach(function(u){ if(u.name==="KITE-1"||u.name==="MARLIN-3"||u.name==="CORAL-48"){ patrolSeen++; if(patrolSeen===1) u.role="RAMMING"; else if(u.d>25) u.role="FLANKING"; } });
+   var shown=units.slice(0,6);
+   var rh=""; shown.forEach(function(u){ rh+='<div class="drow"><span class="dname">'+u.name+'</span><span class="dchip '+u.role+'">'+u.role+'</span><span class="ddist">'+Math.max(1,Math.round(u.d*2))+' m</span></div>'; });
+   document.getElementById("dispatchRows").innerHTML=rh;
+   document.getElementById("dispatchCount").textContent= units.length+" UNIT"+(units.length===1?"":"S")+(units.length>6?" · +"+(units.length-6)+" MORE":"");
+   document.getElementById("dispatchFoot").textContent= (units.length&&units[0].d<15)? "IN SIGHT" : "LOSING SIGHT";
+  }
+ }
+ /* SPEEDOMETER + NAMA MOBIL + KONDISI + RADIO */
+ if(sc2){
+  if(!inCar){ sc2.style.display="none"; }
+  else{
+   sc2.style.display="";
+   var spdKmh= (typeof shotSpeed==="number")? Math.round(shotSpeed*3.6) : Math.round(Math.abs(carSpeed)*3.6);
+   document.getElementById("speedVal").textContent=spdKmh;
+   document.getElementById("carName").textContent=carDisplayName(inCar);
+   var hp=Math.max(0,Math.round(inCar.userData.hp));
+   document.getElementById("carCond").textContent="CONDITION "+hp+"%";
+   var cf=document.getElementById("carCondFill"); cf.style.width=hp+"%"; cf.style.background= hp<30? "#ff5e7a" : "#7ef0c1";
+   document.getElementById("radioLine").textContent="♪ "+(radios[radioIdx]||"");
+  }
+ }
+}
 /* GAME LOOP */
-var clockT=11.5, last=performance.now(), camAngle=0, carSpeed=0, drift=0, menuOrbit=0, minimapTick=0, saveTick=0, lastHurtAt=0, prevHealth=100, lastCarDmgAt=0, lastBoundToastAt=0, copWarnAt=0; /* SPEC 12:33: jam awal 11:30 siang biru cerah; R12: cooldown damage mobil, throttle toast batas kota & peringatan polisi */
+var clockT=11.5, last=performance.now(), camAngle=0, carSpeed=0, drift=0, menuOrbit=0, minimapTick=0, panelTick=0, saveTick=0, lastHurtAt=0, prevHealth=100, lastCarDmgAt=0, lastBoundToastAt=0, copWarnAt=0; /* SPEC 12:33: jam awal 11:30 siang biru cerah; R12: cooldown damage mobil, throttle toast batas kota & peringatan polisi */
 function collide(x,z){ for(var i=0;i<colliders.length;i++){ var c=colliders[i]; if(Math.hypot(x-c.x,z-c.z)<c.r) return true; } return Math.abs(x)>105||Math.abs(z)>105; }
 function animate(){ requestAnimationFrame(animate); var now=performance.now(), dt=Math.min(.05,(now-last)/1000); last=now;
  // day-night cycle (full cycle ~4 min, starts sunset)
@@ -1606,11 +1675,12 @@ function animate(){ requestAnimationFrame(animate); var now=performance.now(), d
    var desired=new THREE.Vector3(fx+Math.sin(camYawS)*_hd2, _vd2, fz+Math.cos(camYawS)*_hd2); camera.position.lerp(desired, look.id!==null?0.35:0.14); var lookY= fy + (camPitchS<0? -camPitchS*11 : 0); /* R13: target pandang dari pitch HALUS */ camera.lookAt(fx,lookY,fz); camAngle=camYawS; }
  updateCombatFx(dt,now); updateABThrottled(now); updateHUD();
  minimapTick+=dt; if(minimapTick>.2){ minimapTick=0; drawMap(document.getElementById("minimap"),.82); } /* R12: minimap 5x/detik (dulu ~8x) — hemat performa */
+ panelTick+=dt; if(panelTick>.25){ panelTick=0; updateHUDPanels(); } /* R14: panel dispatch/slot/rank/speed 4x/detik */
  saveTick+=dt; if(saveTick>5){ saveTick=0; if(gameStarted&&!paused) persistSave(); } /* autosave 5 detik: reload webview di tengah main tidak lagi menghapus progres */
  perfCheck(dt,now); /* TAHAP 5 (lanjutan): deteksi FPS rendah berkelanjutan — hanya berjalan saat main aktif (bukan menu/pause, karena animate berhenti di cabang pause sebelum baris ini) */
  drawFrame();
 }
-var lastAB=0; function updateABThrottled(now){ if(now-lastAB>400){ lastAB=now; if(!inCar) updateAB(); var sbt=document.getElementById("btnSideTop"); if(sbt) sbt.style.display= (typeof sideUnlocked==="function"&&sideUnlocked())? "" : "none"; /* TAHAP 4: tombol 🎯 hanya tampil setelah misi sampingan terbuka */ var sb=document.getElementById("btnShopFloat"); if(sb){ nearShop=nearestShop(); sb.classList.toggle("on", !!nearShop); if(nearShop){ var sml=sb.querySelector("small"); if(sml) sml.textContent=nearShop.short; } } var bh=document.getElementById("btnHouseFloat"); if(bh){ var showH=false, labH="MASUK"; if(inHouse){ if(atExitDoor()){ showH=true; labH="KELUAR"; } } else { nearHouse=houseDoorNear(); if(nearHouse) showH=true; } bh.classList.toggle("on",showH); if(showH){ var shl=bh.querySelector("small"); if(shl) shl.textContent=labH; } } } }
+var lastAB=0; function updateABThrottled(now){ if(now-lastAB>400){ lastAB=now; if(!inCar) updateAB(); var sbt=document.getElementById("btnSideTop"); if(sbt) sbt.style.display= (typeof sideUnlocked==="function"&&sideUnlocked())? "" : "none"; /* TAHAP 4: tombol 🎯 hanya tampil setelah misi sampingan terbuka */ var sb=document.getElementById("btnShopFloat"); if(sb){ nearShop=nearestShop(); sb.classList.toggle("on", !!nearShop); if(nearShop){ var sml=sb.querySelector("small"); if(sml) sml.textContent=nearShop.short; } } var bh=document.getElementById("btnHouseFloat"); if(bh){ var showH=false, labH="ENTER"; if(inHouse){ if(atExitDoor()){ showH=true; labH="EXIT"; } } else { nearHouse=houseDoorNear(); if(nearHouse) showH=true; } bh.classList.toggle("on",showH); if(showH){ var shl=bh.querySelector("small"); if(shl) shl.textContent=labH; } } } }
 /* TABRAKAN MOBIL -> PEMAIN — keluhan user: "ada mobil lewat, kita di depannya, kita tembus gak ketabrak".
    Versi lama: mobil lalu lintas tidak pernah mengecek pemain sama sekali. Kini: mobil MENGEREM bila pemain
    berdiri di depannya; bila jarak sudah terlalu dekat & mobil masih melaju, pemain TERTABRAK: terpental
@@ -1671,7 +1741,7 @@ function updateWanted(dt){ if(wanted<=0){ hiddenT=0; return; } var px=inCar?inCa
  else { hiddenT+=dt; if(hiddenT>6) wanted=Math.max(0,wanted-dt*.13); /* jejak hilang > 6 dtk: wanted luruh ~1 bintang per 8 detik */ }
  if(AC&&wanted>=1&&nd<46){ sirenT-=dt; if(sirenT<=0){ sirenT=.42; sirenHi=!sirenHi; sfxSirenNote(sirenHi); } } /* SIRENE khusus dua nada (bus SFX), hanya bila polisi/roadblock dekat */ }
 function updatePoliceActive(dt){ var tx=inCar?inCar.position.x:player.position.x, tz=inCar?inCar.position.z:player.position.z; police.forEach(function(pc,i){ if(!pc.visible) return; var u=pc.userData; if(u.angle==null) u.angle=pc.rotation.y; var dx=tx-pc.position.x, dz=tz-pc.position.z, d=Math.hypot(dx,dz);
- if(d<12&&performance.now()-copWarnAt>6000){ copWarnAt=performance.now(); toast("🚔 Polisi mendekat — kabur dari pandangan mereka!"); } /* R12: peringatan dulu sebelum tertangkap */
+ if(d<12&&performance.now()-copWarnAt>6000){ copWarnAt=performance.now(); toast("🚔 Police closing in — break line of sight!"); } /* R12: peringatan dulu sebelum tertangkap */
  if(d>75){ var sp=roadSnap(tx+(i-1)*16,tz+24); pc.position.set(sp.x,0,sp.z); u.wp=null; u.angle=Math.atan2(tx-sp.x,tz-sp.z); pc.rotation.y=u.angle; return; } /* respawn pengejar jauh: mendarat DI BADAN JALAN (roadSnap), bukan di dalam gedung */
  var gx=tx, gz=tz;
  if(d>24||!losClear(pc.position.x,pc.position.z,tx,tz)){ if(!u.wp||Math.hypot(u.wp.x-pc.position.x,u.wp.z-pc.position.z)<5) u.wp=pickWp(pc.position.x,pc.position.z,tx,tz); if(u.wp){ gx=u.wp.x; gz=u.wp.z; } } else u.wp=null;
@@ -2025,18 +2095,26 @@ function r9ApplyShot(name){
  if(sc.player){ player.position.set(sc.player.x,0,sc.player.z); playerAngle=0; player.rotation.y=0; }
  if(typeof sc.camYaw==="number") camYaw=sc.camYaw;
  if(typeof sc.camPitch==="number") camPitch=sc.camPitch;
+ if(typeof sc.camZoom==="number") camZoom=sc.camZoom; /* R14: zoom kamera per-shot (chase lebih dekat) */
+ if(typeof sc.rp==="number") shotRP=sc.rp; /* R14: RP tampilan per-shot */
+ if(sc.dialogue) showShotDialog(sc.dialogue); /* R14: dialog staged-shot (portrait + teks), tanpa pause */
  if(sc.weapon){
   var wi=weapons.indexOf(sc.weapon);
   if(wi>=0){ ownedWeapons[wi]=true; if(isGun(sc.weapon)) ammo[sc.weapon]=sc.ammo||12; weaponIdx=wi; refreshWeaponUI(); }
  }
  if(!sc.onFoot&&sc.car){
   var car=null;
-  for(var i=0;i<cars.length;i++){ if(cars[i].userData.parked&&!cars[i].userData.burnt){ car=cars[i]; break; } }
+  /* R14: mobil staged harus CERAH (merah/oranye/kuning/pink) seperti entri top-5 — mobil parkir
+     pertama (hijau gelap) terlihat seperti van dan tenggelam di senja. */
+  var BRIGHT=[0xe53935,0xfb8c00,0xfdd835,0xec407a];
+  for(var bi=0;bi<BRIGHT.length&&!car;bi++){ for(var i2=0;i2<cars.length;i2++){ if(cars[i2].userData.parked&&!cars[i2].userData.burnt&&cars[i2].userData.origColor===BRIGHT[bi]){ car=cars[i2]; break; } } }
+  if(!car){ for(var i=0;i<cars.length;i++){ if(cars[i].userData.parked&&!cars[i].userData.burnt){ car=cars[i]; break; } } }
   if(car){
    car.position.set(sc.car.x,0,sc.car.z);
    car.userData.angle=sc.car.angle; car.rotation.y=sc.car.angle;
    car.userData.parked=false;
    inCar=car; carSpeed=sc.car.speed||0;
+   if(typeof sc.car.speed==="number") shotSpeed=sc.car.speed; /* R14: speedometer shot membaca kecepatan staged */
    player.visible=false; player.position.copy(car.position);
    updateAB();
   }
@@ -2045,7 +2123,7 @@ function r9ApplyShot(name){
   /* Parkir 3 mobil patroli di sekitar pemain supaya kejar-kejaran
      langsung terlihat; updatePoliceActive yang mengemudikan mereka. */
   var px=inCar?inCar.position.x:player.position.x, pz=inCar?inCar.position.z:player.position.z;
-  var offs=[[0,-16],[0,-28],[0,18]]; /* di garis jalan YANG SAMA dengan pemain (belakang, belakang, depan) — dulu diagonal, mobil patroli bisa mendarat di dalam gedung */
+  var offs=[[-14,20],[14,22],[0,30]]; /* R14: ketiganya di DEPAN pemain (flank kiri/kanan + jauh depan) — parkir terlalu dekat bikin mereka menabrak & menumpuk di atas mobil pemain sebelum screenshot */
   police.forEach(function(pc,i){
    var o=offs[i%offs.length];
    pc.position.set(px+o[0],0,pz+o[1]);
