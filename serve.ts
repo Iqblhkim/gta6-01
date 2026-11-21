@@ -1,95 +1,68 @@
-// Kota Seja — Halcyon Edition (round 9): a tiny static file server for game/.
-// Run `node serve.ts` (or `node serve.ts --port 9000`) and open the printed
-// address. Node 22 standard library only — no dependencies, no build step.
-// It only ever serves files under game/, refuses anything outside that
-// directory, and answers 404 for anything that is not a plain file.
-// This is a local development convenience, not a production web server.
-import { createReadStream, statSync } from 'node:fs';
+// serve.ts — a tiny static file server for the Kota Seja game.
+//
+// Serves the game/ directory next to this file so the game can be played in
+// desktop Chrome exactly as the finalist review plays it: plain files over
+// HTTP, nothing else. Standard library only; run it with plain `node`:
+//
+//   node serve.ts            serves on http://localhost:8080
+//   PORT=8130 node serve.ts  serves on http://localhost:8130
+//
+// Pass the port as the first argument instead of the environment when that
+// reads better: `node serve.ts 8130`.
+
 import { createServer } from 'node:http';
-import { extname, join, normalize, resolve, sep } from 'node:path';
+import { createReadStream, existsSync, statSync } from 'node:fs';
+import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// The directory served: game/ next to this file, resolved once at startup.
-const GAME_ROOT = resolve(fileURLToPath(new URL('./game', import.meta.url)));
+const here = resolve(fileURLToPath(new URL('.', import.meta.url)));
+const gameRoot = join(here, 'game');
 
-// A --port <n> argument overrides the default; anything invalid falls
-// back to 8080 instead of crashing the server.
-function pickPort(argv) {
-  const at = argv.indexOf('--port');
-  const wanted = at === -1 ? NaN : Number(argv[at + 1]);
-  return Number.isInteger(wanted) && wanted > 0 && wanted < 65536 ? wanted : 8080;
+const byExtension: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.wav': 'audio/wav',
+  '.mp3': 'audio/mpeg',
+  '.wasm': 'application/wasm',
+};
+
+function fileFor(requestPath: string): string | null {
+  // Keep every answer inside game/, whatever the URL asks for.
+  const cleaned = decodeURIComponent(requestPath).split('?')[0].split('#')[0];
+  const rel = cleaned.replace(/^\/+/, '') || 'index.html';
+  const full = resolve(join(gameRoot, rel));
+  if (full !== gameRoot && !full.startsWith(gameRoot + sep)) return null;
+  if (!existsSync(full) || !statSync(full).isFile()) return null;
+  return full;
 }
 
-// Content types a browser game needs. Anything unlisted is served as a
-// generic byte stream rather than refused — the game has no such files,
-// but a stray asset should still download instead of erroring.
-const CONTENT_TYPES = new Map([
-  ['.html', 'text/html; charset=utf-8'],
-  ['.js', 'text/javascript; charset=utf-8'],
-  ['.mjs', 'text/javascript; charset=utf-8'],
-  ['.css', 'text/css; charset=utf-8'],
-  ['.json', 'application/json; charset=utf-8'],
-  ['.png', 'image/png'],
-  ['.jpg', 'image/jpeg'],
-  ['.jpeg', 'image/jpeg'],
-  ['.gif', 'image/gif'],
-  ['.webp', 'image/webp'],
-  ['.svg', 'image/svg+xml'],
-  ['.ico', 'image/x-icon'],
-  ['.woff2', 'font/woff2'],
-  ['.glb', 'model/gltf-binary'],
-  ['.gltf', 'model/gltf+json'],
-  ['.bin', 'application/octet-stream'],
-  ['.wasm', 'application/wasm'],
-  ['.wav', 'audio/wav'],
-  ['.mp3', 'audio/mpeg'],
-  ['.ogg', 'audio/ogg'],
-  ['.txt', 'text/plain; charset=utf-8'],
-]);
-
-function contentTypeFor(file) {
-  return CONTENT_TYPES.get(extname(file).toLowerCase()) ?? 'application/octet-stream';
+const port = Number(process.argv[2] ?? process.env.PORT ?? 8080);
+if (!Number.isSafeInteger(port) || port < 1 || port > 65535) {
+  console.error(`serve.ts: not a port: ${process.argv[2] ?? process.env.PORT}`);
+  process.exit(2);
 }
 
-// Maps a request path to a file under GAME_ROOT, or null when the path
-// would escape the game directory (directory traversal attempt).
-function fileForRequest(requestPath) {
-  let pathname;
-  try {
-    pathname = decodeURIComponent(requestPath);
-  } catch {
-    return null;
-  }
-  if (pathname.endsWith('/')) pathname += 'index.html';
-  const resolved = resolve(join(GAME_ROOT, normalize(pathname)));
-  if (resolved !== GAME_ROOT && !resolved.startsWith(GAME_ROOT + sep)) return null;
-  return resolved;
-}
-
-const port = pickPort(process.argv.slice(2));
-
-createServer((request, response) => {
-  const url = new URL(request.url ?? '/', 'http://localhost');
-  const file = fileForRequest(url.pathname);
+const server = createServer((req, res) => {
+  const path = req.url ?? '/';
+  const file = fileFor(path);
   if (file === null) {
-    response.writeHead(400).end('bad request');
+    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end('not found\n');
     return;
   }
-  let bytes;
-  try {
-    const info = statSync(file);
-    if (!info.isFile()) throw new Error('not a file');
-    bytes = info.size;
-  } catch {
-    response.writeHead(404).end('not found');
-    return;
-  }
-  response.writeHead(200, {
-    'content-type': contentTypeFor(file),
-    'content-length': bytes,
-    'cache-control': 'no-store',
-  });
-  createReadStream(file).pipe(response);
-}).listen(port, '127.0.0.1', () => {
-  console.log(`Kota Seja (Halcyon) is on http://localhost:${port}`);
+  const type = byExtension[extname(file).toLowerCase()] ?? 'application/octet-stream';
+  res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
+  createReadStream(file).pipe(res);
+});
+
+server.listen(port, '127.0.0.1', () => {
+  console.log(`Kota Seja served at http://localhost:${port}/`);
 });

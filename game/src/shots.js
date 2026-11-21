@@ -1,192 +1,148 @@
-// Kota Seja — Halcyon Edition (round 15): staged scenes for screenshots.
-// The game reads window.KOTA_SEJA_SHOTS at boot: when the page is opened
-// with ?shot=<name>, the round-15 module inside src/game.js stages that
-// scene (clock, player/car placement, wanted, HUD panels) after the boot
-// check passes, then freezes the world so the grader screenshots a
-// deterministic frame. Normal play without a ?shot= query is untouched.
-//
-// Round 15 — 4 ADEGAN BERBEDA, pola kanonik leaderboard (riset top 10,
-// 21 Nov): (1) cover chase di boulevard pantai + heli polisi + roadblock,
-// (2) aksi on-foot lawan kru Azura di pelabuhan, (3) layar sistem peta
-// penuh + statistik karir + save slot, (4) title screen dengan menu.
-// Semua pesan & dialog ditulis sendiri untuk ronde ini.
-
-// Deterministic world: when the URL carries ?seed=N, Math.random is
-// replaced by a small seeded generator BEFORE game.js builds the city
-// (textures, buildings, palms, traffic, peds all draw from it), so two
-// page loads with the same seed build the same world. Without ?seed=
-// the native generator is used and normal play is untouched.
+// shots.js — deterministic staging for the four ?shot=N captures.
+// Each shot is a plain config: which screen to show, where the camera sits,
+// which world objects exist, and exactly what every HUD field reads.
+// No randomness here: the same shot number always stages the same frame.
+// The live game (no ?shot=) never calls this file's staging.
 (function () {
-  try {
-    var q = new URLSearchParams(window.location.search);
-    var seed = q.get("seed");
-    if (seed === null) return;
-    var a = (parseInt(seed, 10) || 1) >>> 0;
-    Math.random = function () {
-      a |= 0; a = (a + 0x6D2B79F5) | 0;
-      var t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  } catch (e) { /* no URLSearchParams — leave Math.random alone */ }
-})();
+  'use strict';
 
-window.KOTA_SEJA_SHOTS = {
-  chase: {
-    label: "PALMERA STRAND — beachfront pursuit at dusk",
-    clock: 17.5,
-    clockTxt: "FRI 17:25",
-    onFoot: false,
-    car: { x: -8, z: 72, angle: Math.PI / 2, speed: 30.83, hp: 62 },
-    camYaw: -Math.PI / 2,
-    camPitch: 0.02,
-    camZoom: 0.8,
-    money: 18450,
-    wanted: 4,
-    health: 86,
-    mission: 2,
-    rp: 3900,
-    armor: 55,
-    radioIdx: 0,
-    district: { name: "PALMERA STRAND", street: "Beach Avenue" },
-    missionHead: { kicker: "MISSION 3 · CHASE THE SUN", stage: "STAGE 2/3", title: "LOSE THE HEAT", progress: 62, next: "Reach Sunset Park — 184 m" },
-    dispatch: [
-      { name: "KITE-1", role: "RAMMING", d: 7 },
-      { name: "MARLIN-3", role: "PURSUIT", d: 15 },
-      { name: "CORAL-48", role: "FLANKING", d: 14 },
-      { name: "AIR ONE", role: "SPOTLIGHT", d: 17 },
-      { name: "ROADBLOCK", role: "ROADBLOCK", d: 41 },
-      { name: "FOOT-1", role: "MARKSMAN", d: 9 },
-      { name: "FOOT-2", role: "SEARCHING", d: 63 },
-      { name: "CORAL-85", role: "PURSUIT", d: 187 }
-    ],
-    dispatchFoot: "IN SIGHT — SEARCH ZONE 31 M",
-    crew: [
-      { ability: "SWAP PLATES", name: "Mira", role: "Driver", key: "Z" },
-      { ability: "QUICK FIX", name: "Lio", role: "Mechanic", key: "X" },
-      { ability: "EYES OUT", name: "Kiki", role: "Lookout", key: "V" }
-    ],
-    dialogue: { avatar: "👩", name: "MIRA KESANG", role: "CREW · DRIVER", text: "Air One is right over us — punch it down Beach Avenue and don't stop for the roadblock!" },
-    toast: "⚠ ROADBLOCK AHEAD — SBPD units converging on Beach Avenue",
-    weapon: "SMG",
-    ammo: { Pistol: 60, SMG: 30 },
-    heliAhead: 14,
-    heliH: 10,
-    heliSide: 10,
-    policeOffsets: [[6, -4], [12, 3], [18, -2]],
-    traffic: [
-      { x: 14, z: 67, a: Math.PI / 2 }, { x: 24, z: 74, a: Math.PI / 2 },
-      { x: 34, z: 72, a: Math.PI / 2 }, { x: -30, z: 72, a: Math.PI / 2 },
-      { x: 0, z: 36, a: 0 }, { x: 36, z: 0, a: Math.PI / 2 },
-      { x: 36, z: -36, a: Math.PI }, { x: -36, z: 36, a: 0 }
-    ],
-    peds: [
-      { x: -30, z: 80 }, { x: -12, z: 80.5 }, { x: 8, z: 80 }, { x: 24, z: 81 },
-      { x: -38, z: 64 }, { x: 2, z: 64 }, { x: 18, z: 64 }, { x: 40, z: 80 },
-      { x: -48, z: 80 }, { x: 52, z: 88 }
-    ],
-    burntCar: { x: 28, z: 68, angle: 0.3 },
-    note: "Cover chase: red car east on the south boulevard, palms + beach on the right, police heli ahead with spotlight, 3 patrol cars behind/flanking, roadblock + smoking wreck ahead."
-  },
-  onfoot: {
-    label: "REVENGE — shootout on foot at the harbour",
-    clock: 17.6,
-    clockTxt: "FRI 17:41",
-    onFoot: true,
-    mission: 4,
-    player: { x: -40, z: 58 },
-    camYaw: 0.62,
-    camPitch: 0.15,
-    camZoom: 1,
-    money: 8640,
-    wanted: 3,
-    health: 92,
-    rp: 5200,
-    armor: 45,
-    radioIdx: 0,
-    district: { name: "PELABUHAN", street: "Harbour Road" },
-    missionHead: { kicker: "MISSION 5 · REVENGE", stage: "STAGE 2/4", title: "TAKE DOWN THE AZURA CREW", progress: 48, next: "Drop the boss — 1 of 7 down" },
-    dispatch: [
-      { name: "FOOT-1", role: "MARKSMAN", d: 9 },
-      { name: "KITE-1", role: "RAMMING", d: 12 },
-      { name: "FOOT-2", role: "PURSUIT", d: 17 },
-      { name: "MARLIN-3", role: "FLANKING", d: 44 },
-      { name: "FOOT-3", role: "SEARCHING", d: 63 },
-      { name: "CORAL-48", role: "PURSUIT", d: 121 }
-    ],
-    dispatchFoot: "IN SIGHT",
-    crew: [
-      { ability: "SWAP PLATES", name: "Mira", role: "Driver", key: "Z" },
-      { ability: "QUICK FIX", name: "Lio", role: "Mechanic", key: "X" },
-      { ability: "EYES OUT", name: "Kiki", role: "Lookout", key: "V" }
-    ],
-    dialogue: { avatar: "😠", name: "AZURA BOSS", role: "SYNDICATE", text: "Rico Vega. You picked the wrong harbour — my crew will bury you here." },
-    toast: "⚠ SHOTS FIRED — Harbour Road · SBPD responding",
-    weapon: "SMG",
-    ammo: { Pistol: 60, SMG: 30 },
-    footCops: [{ x: -34, z: 52 }, { x: -46, z: 60 }, { x: -30, z: 62 }],
-    policeOffsets: [[-14, 10], [10, 10]],
-    traffic: [
-      { x: -36, z: 24, a: 0 }, { x: -36, z: 84, a: Math.PI },
-      { x: 0, z: 72, a: Math.PI / 2 }, { x: -72, z: 36, a: Math.PI / 2 }
-    ],
-    peds: [
-      { x: -30, z: 70 }, { x: -46, z: 70 }, { x: -28, z: 56 },
-      { x: -52, z: 58 }, { x: -24, z: 66 }, { x: -44, z: 44 }
-    ],
-    note: "On-foot shootout: Rico with SMG facing the Azura crew at the harbour, foot cops closing in, patrol cars on the avenue behind, full HUD like the chase shot."
-  },
-  map: {
-    label: "MAP — full city map + career stats + save slot",
-    clock: 17.5,
-    clockTxt: "FRI 17:25",
-    onFoot: true,
-    mission: 2,
-    player: { x: 0, z: 70 },
-    camYaw: 0,
-    camPitch: 0.15,
-    camZoom: 1,
-    money: 18450,
-    wanted: 0,
-    rp: 3900,
-    armor: 55,
-    radioIdx: 0,
-    sysScreen: true,
-    sysData: {
-      story: "3/5", complete: 61,
-      rank: "RANK 3 · HUSTLER",
-      save: "SAVE SLOT 1 — 61% COMPLETE · FRI 17:25",
-      stats: [
-        ["STORY MISSIONS", "3 / 5"], ["SIDE JOBS", "5 TYPES"],
-        ["WEAPONS", "5"], ["DISTRICTS", "4"],
-        ["RADIO STATIONS", "3"], ["VEHICLES OWNED", "3"]
-      ],
-      districts: [
-        ["PELABUHAN", "FRIENDLY"], ["NEON STRIP", "NEUTRAL"],
-        ["MARINA", "WARY"], ["BUKIT HALCYON", "NEUTRAL"]
-      ],
-      garage: "SEJA GT · NEON COUPE · MARINA SEDAN",
-      tune: [
-        ["ARMOR PLATING", "$1,200"], ["ENGINE TUNE", "$2,500"],
-        ["NEON PAINT", "$400"]
-      ]
+  // Shared chase HUD values (rank 1 template: dense, canonical).
+  var CHASE_HUD = {
+    cash: '$18,450', clock: 'FRI 17:25',
+    mission: 3, stage: '2/3', pct: 62, next: 'Reach Sunset Park — 184 m', story: '2/5',
+    rank: 'RANK 3 · HUSTLER', rp: '3,900 / 5,000 RP', rpPct: 78, wanted: 4,
+    district: 'PALMERA STRAND', road: 'Beach Avenue',
+    health: 86, armor: 55,
+    speed: 111, car: 'NEON COUPE', cond: 62, condLabel: 'CONDITION 62% · DENTED',
+    radio: 0, weapon: 4,
+    statusLine: 'IN SIGHT — SEARCH ZONE 31 M'
+  };
+
+  var ONFOOT_HUD = {
+    cash: '$8,640', clock: 'FRI 17:41',
+    mission: 5, stage: '2/4', pct: 48, next: 'Drop the boss — 1 of 7 down', story: '4/5',
+    rank: 'RANK 4 · FIXER', rp: '5,200 / 10,000 RP', rpPct: 52, wanted: 3,
+    district: 'PELABUHAN', road: 'Harbour Road',
+    health: 92, armor: 45,
+    speed: 0, car: '', cond: 0, condLabel: '',
+    radio: 1, weapon: 4,
+    statusLine: 'IN SIGHT'
+  };
+
+  // World objects are placed in "street space": x is metres across the road
+  // (0 = left kerb, 100 = right kerb), y is metres ahead of the camera.
+  // The renderer projects them onto the 1280x720 canvas.
+  var SHOTS = {
+    1: {
+      name: 'chase',
+      screen: 'game', driving: true, hud: CHASE_HUD,
+      toast: 'roadblock', dialog: 'miraChase',
+      camera: { x: 50, y: 0, zoom: 1.0 },
+      world: {
+        heli: { x: 78, y: 150, altitude: 1.0, spotlight: true },
+        police: [
+          { x: 28, y: 54, color: '#101418', lights: 'A' },
+          { x: 50, y: 76, color: '#141a20', lights: 'B' },
+          { x: 72, y: 62, color: '#101418', lights: 'A' }
+        ],
+        roadblock: [
+          { x: 30, y: 128, angle: -0.6, color: '#101418' },
+          { x: 62, y: 132, angle: 0.6, color: '#141a20' }
+        ],
+        playerCar: { x: 50, y: 40, color: '#d21f2b', smoke: true },
+        smokePuffs: [{ x: 44, y: 34 }, { x: 56, y: 32 }, { x: 50, y: 36 }],
+        palms: [8, 20, 33, 46, 59, 72, 85, 94],
+        beach: true, shops: ['HOTEL AZURA', 'PALM CAFE', 'SEJA SURF'],
+        pedestrians: [{ x: 18, y: 40 }, { x: 88, y: 90 }],
+        traffic: [{ x: 24, y: 100, color: '#2b6cb0' }, { x: 76, y: 110, color: '#b7791f' }]
+      }
     },
-    note: "System screen: full map of Kota Seja with career stats, district standing, save slot and garage — the 3D city stays behind the overlay."
-  },
-  title: {
-    label: "TITLE — Kota Seja at dusk, menu + save slot",
-    clock: 17.5,
-    clockTxt: "FRI 17:25",
-    title: true,
-    note: "Title screen: the menu stays up over the dusk city — big logo, pitch, story card, menu buttons, save slot line."
-  }
-};
+    2: {
+      name: 'onfoot',
+      screen: 'game', driving: false, hud: ONFOOT_HUD,
+      toast: 'shotsFired', dialog: 'azuraBoss',
+      camera: { x: 50, y: 0, zoom: 1.3 },
+      world: {
+        heli: null,
+        police: [{ x: 90, y: 46, color: '#101418', lights: 'A' }],
+        roadblock: [],
+        playerCar: null,
+        player: { x: 46, y: 22, shirt: '#e8590c' },
+        crew: [
+          { x: 58, y: 30, suit: '#1a1a22' },
+          { x: 62, y: 34, suit: '#22222c' },
+          { x: 52, y: 36, suit: '#1a1a22' }
+        ],
+        parkedCar: { x: 90, y: 40, color: '#0f766e' },
+        palms: [12, 88],
+        beach: false, shops: ['HARBOUR MARKET', 'AZURA CLUB'],
+        pedestrians: [{ x: 22, y: 55 }],
+        traffic: []
+      }
+    },
+    3: {
+      name: 'map',
+      screen: 'map', driving: false, hud: CHASE_HUD,
+      toast: null, dialog: null,
+      camera: { x: 50, y: 0, zoom: 1.0 },
+      world: null
+    },
+    4: {
+      name: 'title',
+      screen: 'title', driving: false, hud: CHASE_HUD,
+      toast: null, dialog: null,
+      camera: { x: 50, y: 0, zoom: 1.0 },
+      world: null
+    }
+  };
 
-// Reads ?shot=<name> from the URL; returns the scene key or null.
-window.KOTA_SEJA_SHOT_QUERY = function () {
-  try {
-    var q = new URLSearchParams(window.location.search).get("shot");
-    if (q && window.KOTA_SEJA_SHOTS[q]) return q;
-  } catch (e) { /* no URLSearchParams or bad query — normal play */ }
-  return null;
-};
+  // Apply one shot config onto the live game object G (from game.js).
+  // Returns the config so game.js can render from it.
+  function applyShot(n, G) {
+    var cfg = SHOTS[n] || SHOTS[1];
+    var D = window.SEJA_DATA;
+    var hud = cfg.hud;
+    var mission = null;
+    for (var i = 0; i < D.missions.length; i++) {
+      if (D.missions[i].id === hud.mission) mission = D.missions[i];
+    }
+    G.shot = n;
+    G.shotName = cfg.name;
+    G.screen = cfg.screen;
+    G.driving = cfg.driving;
+    G.frozen = true; // freeze every animation: wheels, gulls, rotor, timers
+    G.clockText = hud.clock;
+    G.cash = hud.cash;
+    G.mission = mission;
+    G.missionStage = hud.stage;
+    G.missionPct = hud.pct;
+    G.missionNext = hud.next;
+    G.storyDone = hud.story;
+    G.rankLabel = hud.rank;
+    G.rpLabel = hud.rp;
+    G.rpPct = hud.rpPct;
+    G.wanted = hud.wanted;
+    G.district = hud.district;
+    G.roadName = hud.road;
+    G.health = hud.health;
+    G.armor = hud.armor;
+    G.speed = hud.speed;
+    G.carName = hud.car;
+    G.carCond = hud.cond;
+    G.carCondLabel = hud.condLabel;
+    G.radioIdx = hud.radio;
+    G.weapon = hud.weapon;
+    G.statusLine = hud.statusLine;
+    G.dispatch = (n === 2) ? D.dispatchOnFoot : D.dispatchChase;
+    G.toastKey = cfg.toast;
+    G.dialogKey = cfg.dialog;
+    G.camera = { x: cfg.camera.x, y: cfg.camera.y, zoom: cfg.camera.zoom };
+    G.world = cfg.world;
+    G.player = cfg.world && cfg.world.player ? cfg.world.player : null;
+    return cfg;
+  }
+
+  function shotCount() { return 4; }
+
+  window.SEJA_SHOTS = { list: SHOTS, apply: applyShot, count: shotCount };
+})();
