@@ -1454,6 +1454,7 @@ document.getElementById("btnSide").onclick=function(){ openSideModal(); };
 document.getElementById("btnSideTop").onclick=function(){ openSideModal(); };
 /* MAPS */
 function drawMap(cv,scale){ if(!cv) return; try{ /* R12: minimap TIDAK PERNAH dimatikan permanen — frame yang gagal cukup dilewati, frame berikutnya digambar lagi */
+ var nowMs=(typeof shotFrozen!=="undefined"&&shotFrozen)?shotFrozenNow:performance.now(); /* R15: denyut penanda memakai "now" beku saat shot dibekukan — minimap deterministik */
  var g=cv.getContext("2d"); if(!g) throw new Error("no 2d context");
  var W=cv.width, cx=W/2, cz=W/2;
  g.fillStyle="#2e7d46"; g.fillRect(0,0,W,W);
@@ -1482,9 +1483,9 @@ function drawMap(cv,scale){ if(!cv) return; try{ /* R12: minimap TIDAK PERNAH di
  // pickup aktif: medkit merah muda, uang hijau
  pickups.forEach(function(p){ if(!p.active) return; g.fillStyle= p.kind==="medkit"? "#ff5e7a" : "#7CFC00"; g.fillRect(cx+p.x*scale-2.5,cz+p.z*scale-2.5,5,5); });
  // mission marker (pulsing ring)
- var m=missions[missionIdx]; if(m){ var pr=8+Math.sin(performance.now()*.006)*2.5; g.fillStyle="#ff2e55"; g.beginPath(); g.arc(cx+m.x*scale,cz+m.z*scale,7,0,7); g.fill(); g.strokeStyle="#ff2e55"; g.lineWidth=2; g.beginPath(); g.arc(cx+m.x*scale,cz+m.z*scale,pr+4,0,7); g.stroke(); }
+ var m=missions[missionIdx]; if(m){ var pr=8+Math.sin(nowMs*.006)*2.5; g.fillStyle="#ff2e55"; g.beginPath(); g.arc(cx+m.x*scale,cz+m.z*scale,7,0,7); g.fill(); g.strokeStyle="#ff2e55"; g.lineWidth=2; g.beginPath(); g.arc(cx+m.x*scale,cz+m.z*scale,pr+4,0,7); g.stroke(); }
  // TAHAP 4: target misi sampingan — lingkaran emas berdenyut
- if(typeof side!=="undefined"&&side.active){ var spr=7+Math.sin(performance.now()*.006)*2; g.fillStyle="#ffb300"; g.beginPath(); g.arc(cx+side.tx*scale,cz+side.tz*scale,6,0,7); g.fill(); g.strokeStyle="#ffb300"; g.lineWidth=2; g.beginPath(); g.arc(cx+side.tx*scale,cz+side.tz*scale,spr+3,0,7); g.stroke(); }
+ if(typeof side!=="undefined"&&side.active){ var spr=7+Math.sin(nowMs*.006)*2; g.fillStyle="#ffb300"; g.beginPath(); g.arc(cx+side.tx*scale,cz+side.tz*scale,6,0,7); g.fill(); g.strokeStyle="#ffb300"; g.lineWidth=2; g.beginPath(); g.arc(cx+side.tx*scale,cz+side.tz*scale,spr+3,0,7); g.stroke(); }
  // player dot with heading tick
  var px=inCar?inCar.position.x:player.position.x, pz=inCar?inCar.position.z:player.position.z;
  var pa=inCar?inCar.userData.angle:player.rotation.y;
@@ -1492,7 +1493,7 @@ function drawMap(cv,scale){ if(!cv) return; try{ /* R12: minimap TIDAK PERNAH di
  g.fillStyle="#00e5ff"; g.beginPath(); g.arc(cx+px*scale,cz+pz*scale,6.5,0,7); g.fill(); g.strokeStyle="#fff"; g.lineWidth=2; g.stroke();
  }catch(e){ return; } }
 function drawBigMap(){ drawMap(document.getElementById("bigMapCanvas"),1.9); var g=document.getElementById("bigMapCanvas").getContext("2d"); g.fillStyle="#fff"; g.font="bold 15px sans-serif"; g.fillText("MARINA",40,50); g.fillText("BUKIT HALCYON",430,50); g.fillText("PELABUHAN",40,600); g.fillText("NEON STRIP",450,600); g.fillText("TAMAN SENJA",270,300); }
-function updateHUD(){ document.getElementById("money").textContent=money; document.getElementById("health").textContent=Math.max(0,Math.round(health)); var s=""; for(var i=0;i<5;i++) s+= i<Math.ceil(wanted)?"★":"☆"; /* R12: bintang DIBULATKAN KE ATAS — wanted 0,5 langsung tampil 1★, sinkron dengan toast "+1★" */ document.getElementById("stars").textContent=s; var wl=document.getElementById("wantedLabel"); if(wl) wl.style.display= wanted>=1? "" : "none"; /* R14: label WANTED di samping bintang */
+function updateHUD(){ document.getElementById("money").textContent=Number(money).toLocaleString("en-US"); /* R15: pemisah ribuan ($18,450) seperti entri top-10 */ document.getElementById("health").textContent=Math.max(0,Math.round(health)); var s=""; for(var i=0;i<5;i++) s+= i<Math.ceil(wanted)?"★":"☆"; /* R12: bintang DIBULATKAN KE ATAS — wanted 0,5 langsung tampil 1★, sinkron dengan toast "+1★" */ document.getElementById("stars").textContent=s; var wl=document.getElementById("wantedLabel"); if(wl) wl.style.display= wanted>=1? "" : "none"; /* R14: label WANTED di samping bintang */
  var wn=weapons[weaponIdx]; document.getElementById("weapon").textContent= isGun(wn)? weaponEN(wn)+" • "+(ammo[wn]||0) : weaponEN(wn); var wpill=document.getElementById("weapon").parentNode; if(wpill) wpill.style.color= (isGun(wn)&&(ammo[wn]||0)<=0)? "#ff8fa3" : ""; /* indikator amunisi: pill senjata memerah saat peluru habis */
  var rp=document.getElementById("radioPill"); if(rp) rp.textContent="♪ "+(radios[radioIdx]||"").split(" — ")[0]; /* R14: stasiun radio tampil terus di bar atas */
  var mkn=document.getElementById("medkitN"); if(mkn) mkn.textContent=medkits; var bmk=document.getElementById("btnMedkit"); if(bmk) bmk.textContent= medkits>0? "💊"+medkits : "💊";
@@ -1502,6 +1503,14 @@ function updateHUD(){ document.getElementById("money").textContent=money; docume
    Diperbarui 4x/detik dari loop (bukan tiap frame) supaya DOM tidak diaduk terus. */
 var shotRP=null; /* R14: RP tampilan untuk staged shot (null = hitung dari progres nyata) */
 var shotSpeed=null; /* R14: kecepatan tampilan staged shot (KM/H dari sc.car.speed) — mobil staged berhenti, tapi speedometer shot harus tetap membaca kecepatan kejar-kejaran */
+var shotArmor=null; /* R15: nilai bar ARMOR tampilan untuk staged shot (game tidak punya sistem armor; angka staging mengikuti pola top-10) */
+var shotClockTxt=null; /* R15: jam + hari tampilan staged shot, mis. "FRI 17:25" */
+var shotDispatch=null; /* R15: daftar unit dispatch tampilan staged shot (null = hitung dari posisi polisi nyata) */
+var shotDispatchFoot=null; /* R15: baris status bawah panel dispatch staged shot */
+var shotFrozen=false; /* R15: dunia dibekukan setelah staging supaya screenshot deterministik */
+var shotFrozenNow=1000; /* R15: "now" beku untuk denyut penanda peta saat shotFrozen */
+var RADIO_SONGS=["Sunset Drive — The Palms","Neon Skyline — Vector Hearts","Pantai Lights — Marisol"]; /* R15: lagu yang sedang diputar per stasiun radio */
+var AMMO_RESERVE={Pistol:120,SMG:60,Shotgun:24}; /* R15: cadangan amunisi tampilan slot senjata */
 var RANKS=[[0,"ROOKIE"],[1000,"STREET"],[2500,"HUSTLER"],[5000,"FIXER"],[10000,"LEGEND"]];
 function respectRP(){ if(typeof shotRP==="number") return shotRP; var sd=0; if(typeof side!=="undefined"&&side.done){ for(var k in side.done) sd+=side.done[k]; } return missionIdx*1000+sd*250+Math.floor(money/10); }
 var CAR_MODELS=["SEJA GT","NEON COUPE","MARINA SEDAN","HALCYON SPORT","PELABUHAN VAN","SUNSET ROADSTER"];
@@ -1520,12 +1529,26 @@ function updateHUDPanels(){
   document.getElementById("rankRp").textContent= rp.toLocaleString("en-US")+" / "+(next? next.toLocaleString("en-US") : "MAX")+" RP"; }
  /* SLOT SENJATA bernomor */
  if(ws){ ws.style.display=""; var h=""; for(var wi=0;wi<weapons.length;wi++){ var owned=ownedWeapons[wi], cur=wi===weaponIdx;
-   var ammoTxt= owned? (isGun(weapons[wi])? ((ammo[weapons[wi]]||0)+"") : "∞") : "LOCKED";
+   var ammoTxt= owned? (isGun(weapons[wi])? ((ammo[weapons[wi]]||0)+" / "+(AMMO_RESERVE[weapons[wi]]||60)) : "∞") : "LOCKED";
    h+='<div class="wslot'+(cur?" cur":"")+(owned?"":" locked")+'"><span class="wnum">'+(wi+1)+'</span><span class="wico">'+WEAPON_ICO[wi]+'</span><span class="wname">'+weaponEN(weapons[wi])+'</span><span class="wammo">'+ammoTxt+'</span></div>'; }
   ws.innerHTML=h; }
+ /* VITALS — bar HEALTH/ARMOR di bawah minimap (shot mode). */
+ var vh=document.getElementById("vHealthFill");
+ if(vh){ var hpct=Math.max(0,Math.round(health)); vh.style.width=hpct+"%"; document.getElementById("vHealthPct").textContent=hpct; }
+ var va=document.getElementById("vArmorFill");
+ if(va){ var ap=(typeof shotArmor==="number")?shotArmor:0; va.style.width=ap+"%"; document.getElementById("vArmorPct").textContent=ap; }
  /* PANEL DISPATCH POLISI */
  if(dp){
-  if(wanted<1){ dp.style.display="none"; }
+  if(shotDispatch&&shotDispatch.length){
+   /* R15: daftar unit staged — peran & jarak bervariasi seperti top-10, bukan hasil hitung posisi nyata */
+   dp.style.display="";
+   var shown15=shotDispatch.slice(0,6);
+   var rh=""; shown15.forEach(function(u){ rh+='<div class="drow"><span class="dname">'+u.name+'</span><span class="dchip '+u.role+'">'+u.role+'</span><span class="ddist">'+u.d+' m</span></div>'; });
+   document.getElementById("dispatchRows").innerHTML=rh;
+   document.getElementById("dispatchCount").textContent= shotDispatch.length+" UNITS";
+   document.getElementById("dispatchFoot").textContent= shotDispatchFoot||"IN SIGHT";
+  }
+  else if(wanted<1){ dp.style.display="none"; }
   else{
    dp.style.display="";
    var px=inCar?inCar.position.x:player.position.x, pz=inCar?inCar.position.z:player.position.z;
@@ -1555,9 +1578,10 @@ function updateHUDPanels(){
    document.getElementById("speedVal").textContent=spdKmh;
    document.getElementById("carName").textContent=carDisplayName(inCar);
    var hp=Math.max(0,Math.round(inCar.userData.hp));
-   document.getElementById("carCond").textContent="CONDITION "+hp+"%";
+   document.getElementById("carCond").textContent="CONDITION "+hp+"%"+(hp<85?" · "+(hp<45?"SMOKING":"DENTED"):""); /* R15: kerusakan terlihat (62% DENTED) seperti top-10 */
    var cf=document.getElementById("carCondFill"); cf.style.width=hp+"%"; cf.style.background= hp<30? "#ff5e7a" : "#7ef0c1";
-   document.getElementById("radioLine").textContent="♪ "+(radios[radioIdx]||"");
+   var rl="♪ "+(radios[radioIdx]||""); if(radioIdx<3&&RADIO_SONGS[radioIdx]) rl+=" — "+RADIO_SONGS[radioIdx]; /* R15: stasiun + lagu yang diputar */
+   document.getElementById("radioLine").textContent=rl;
   }
  }
 }
@@ -1565,6 +1589,29 @@ function updateHUDPanels(){
 var clockT=11.5, last=performance.now(), camAngle=0, carSpeed=0, drift=0, menuOrbit=0, minimapTick=0, panelTick=0, saveTick=0, lastHurtAt=0, prevHealth=100, lastCarDmgAt=0, lastBoundToastAt=0, copWarnAt=0; /* SPEC 12:33: jam awal 11:30 siang biru cerah; R12: cooldown damage mobil, throttle toast batas kota & peringatan polisi */
 function collide(x,z){ for(var i=0;i<colliders.length;i++){ var c=colliders[i]; if(Math.hypot(x-c.x,z-c.z)<c.r) return true; } return Math.abs(x)>105||Math.abs(z)>105; }
 function animate(){ requestAnimationFrame(animate); var now=performance.now(), dt=Math.min(.05,(now-last)/1000); last=now;
+ /* R15 FROZEN SHOT: setelah staging, dunia TIDAK bergerak lagi — pencahayaan
+    senja dihitung ulang dari clockT yang beku (deterministik), kamera diam di
+    posisi snap, HUD + minimap digambar ulang dari state beku. Di menu (title
+    shot) kamera diam di satu sudut skyline. Tanpa ini, lalu lintas/awan/heli
+    bergerak antar-capture dan screenshot tidak pernah identik. */
+ if(shotFrozen){
+  var sA=((clockT-6)/12)*Math.PI, el=Math.sin(sA);
+  updateSkyDome(el);
+  sun.position.set(Math.cos(sA)*120,Math.max(8,el*110),60); sunSprite.position.copy(sun.position).multiplyScalar(2.2);
+  var dF=Math.max(0,Math.min(1,(el-.03)/.5)), isN=el<0;
+  sun.intensity=isN?.25:1.12+dF*.6; sun.color.setHex(0xffb36b).lerp(_daySun,dF);
+  amb.intensity=.42+dF*.42; amb.color.setHex(0xffd9b0).lerp(_dayAmb,dF);
+  hemi.intensity=.34+dF*.48; hemi.color.setHex(0xff9e7a).lerp(_dayHemiSky,dF); hemi.groundColor.setHex(0x2b1a4a).lerp(_dayHemiGnd,dF);
+  scene.fog.far=430+dF*90;
+  if(gameStarted){ /* arah pandang mengikuti pitch seperti loop live (pitch negatif = mendongak, heli masuk bingkai) */
+   var ffx=inCar?inCar.position.x:player.position.x, ffz=inCar?inCar.position.z:player.position.z;
+   camera.lookAt(ffx,1+(camPitch<0?-camPitch*11:0),ffz);
+   drawFrame(); updateHUDPanels(); var mm=document.getElementById("minimap"); if(mm) drawMap(mm,.82);
+   if(!window.__r15dbgDone){ window.__r15dbgDone=true; try{ var hv=new THREE.Vector3(policeHeli.g.position.x,policeHeli.g.position.y,policeHeli.g.position.z).project(camera); var cv=inCar?new THREE.Vector3(inCar.position.x,1,inCar.position.z).project(camera):null; window.__r15dbg={heliNdc:[Math.round(hv.x*100)/100,Math.round(hv.y*100)/100], heliPos:[Math.round(policeHeli.g.position.x),Math.round(policeHeli.g.position.y),Math.round(policeHeli.g.position.z)], heliVis:policeHeli.g.visible, carNdc:cv?[Math.round(cv.x*100)/100,Math.round(cv.y*100)/100]:null, carPos:inCar?[Math.round(inCar.position.x),Math.round(inCar.position.z)]:null, carVis:inCar?inCar.visible:null, camPos:[Math.round(camera.position.x*10)/10,Math.round(camera.position.y*10)/10,Math.round(camera.position.z*10)/10], roadblocks:roadblocks.map(function(r){ return [Math.round(r.position.x),Math.round(r.position.z),r.visible]; }), burnt:cars.filter(function(c){ return c.userData.burnt; }).map(function(c){ return [Math.round(c.position.x),Math.round(c.position.z)]; }), smokeN:smokePool.filter(function(p){ return p.s.visible; }).length}; }catch(e){} }
+  }
+  else { camera.position.set(38,16,64); camera.lookAt(0,8,0); drawFrame(); }
+  return;
+ }
  // day-night cycle (full cycle ~4 min, starts sunset)
  if(gameStarted&&!paused) clockT=(clockT+dt*.045)%24; /* R12: jam HANYA berjalan saat benar-benar bermain — dulu ikut jalan saat pause/menu/fail sehingga melompat (23:xx -> 02:04 setelah checkpoint) */ var sunA=((clockT-6)/12)*Math.PI; var elev=Math.sin(sunA); var isNight=elev<0;
  updateSkyDome(elev);
@@ -1577,7 +1624,7 @@ function animate(){ requestAnimationFrame(animate); var now=performance.now(), d
  amb.intensity=.42+dayF*.42; amb.color.setHex(0xffd9b0).lerp(_dayAmb,dayF);
  hemi.intensity=.34+dayF*.48; hemi.color.setHex(0xff9e7a).lerp(_dayHemiSky,dayF); hemi.groundColor.setHex(0x2b1a4a).lerp(_dayHemiGnd,dayF);
  scene.fog.far=430+dayF*90;
- var hh=Math.floor(clockT), mm=Math.floor((clockT-hh)*60); document.getElementById("clock").textContent=(hh<10?"0":"")+hh+":"+(mm<10?"0":"")+mm;
+ var hh=Math.floor(clockT), mm=Math.floor((clockT-hh)*60); document.getElementById("clock").textContent=(typeof shotClockTxt==="string")?shotClockTxt:(hh<10?"0":"")+hh+":"+(mm<10?"0":"")+mm; /* R15: jam + hari staged menimpa jam berjalan */
  clouds.forEach(function(c,i){ c.position.x+=dt*(1+i*.2); if(c.position.x>180) c.position.x=-180; }); /* ROUND 9: batas wrap drift disesuaikan ke sebaran awan baru ±170 */
  updateHelis(dt,now); /* helikopter hiasan terbang juga di latar menu */
  trees.forEach(function(t){ t.rotation.z=Math.sin(now*.001+t.userData.sway)*.03; });
@@ -2078,34 +2125,178 @@ function r9SnapCamera(){
  /* Tempatkan kamera persis di posisi orbit yang diinginkan supaya shot
     pertama sudah terbingkai — loop utama hanya me-lerp dari sana. */
  var fx=inCar?inCar.position.x:player.position.x, fz=inCar?inCar.position.z:player.position.z, fy=inCar?1:1.6;
- var dist=inCar?12:9, hd=Math.cos(camPitch)*dist, vd=Math.max(.55,Math.sin(camPitch)*dist+1.1); /* SPEC 12:33: jarak snap kamera disamakan dengan loop utama (9/12) */
+ var dist=(inCar?12:9)*(camZoom||1), hd=Math.cos(camPitch)*dist, vd=Math.max(.55,Math.sin(camPitch)*dist+1.1); /* SPEC 12:33: jarak snap kamera disamakan dengan loop utama (9/12) — R15: jarak ikut camZoom seperti loop live, supaya zoom per-shot benar-benar berlaku */
  camera.position.set(fx+Math.sin(camYaw)*hd,vd,fz+Math.cos(camYaw)*hd);
  camera.lookAt(fx,fy,fz);
 }
+/* ============ ROUND 15 — STAGING 4 ADEGAN + DUNIA BEKU ============
+   Setiap shot: staging lengkap dari window.KOTA_SEJA_SHOTS, lalu dunia
+   dibekukan (shotFrozen) supaya frame yang di-screenshot deterministik.
+   r15SnapWorld menempatkan ulang SEMUA elemen bergerak ke pose tetap —
+   tanpa ini, posisi lalu lintas/awan/heli saat freeze bergantung pada
+   berapa frame menu sempat berjalan, dan dua capture tidak pernah sama. */
+function r15SnapWorld(sc){
+ sc=sc||{};
+ /* Baseline deterministik: awan, pohon, laut, heli hiasan, camar, perahu,
+    mercusuar, plakat toko, pickup, asap, lampu lalu lintas. */
+ if(typeof clouds!=="undefined") clouds.forEach(function(c,i){ c.position.set(-160+i*20,44+(i%3)*7,-120+(i%5)*48); });
+ if(typeof trees!=="undefined") trees.forEach(function(t){ t.rotation.z=0; });
+ if(typeof ocean!=="undefined") ocean.position.x=0;
+ if(typeof helis!=="undefined") helis.forEach(function(h,i){ var hp=i? [60,31,40] : [-40,24,-60]; h.g.position.set(hp[0],hp[1],hp[2]); h.g.rotation.y=i?2.2:0.8; h.g.rotation.z=i?-.1:.1; if(h.rotor) h.rotor.rotation.y=i?1.9:0.7; if(h.tr) h.tr.rotation.x=0.7; if(h.cone) h.cone.material.opacity=.1; if(h.bl) h.bl.visible=true; });
+ if(typeof gulls!=="undefined") gulls.forEach(function(u,i){ var ga=i*1.3; u.g.position.set(u.cx+Math.cos(ga)*u.r,u.h,u.cz+Math.sin(ga)*u.r); u.g.rotation.y=i*0.9; if(u.wl) u.wl.rotation.z=.5; if(u.wr) u.wr.rotation.z=-.5; });
+ if(typeof r9SouthGulls!=="undefined") r9SouthGulls.forEach(function(u,i){ u.g.position.set(-40+i*26,26,100); u.g.rotation.y=0; if(u.g.children[0]) u.g.children[0].rotation.z=.5; if(u.g.children[1]) u.g.children[1].rotation.z=-.5; });
+ if(typeof boats!=="undefined") boats.forEach(function(b,i){ b.g.position.set(b.bx,-0.6,140+i*12); b.g.rotation.set(0,0,0); });
+ if(typeof r9Beacon!=="undefined"&&r9Beacon) r9Beacon.rotation.y=0.8;
+ if(typeof r9BeaconBeam!=="undefined"&&r9BeaconBeam) r9BeaconBeam.material.opacity=.07;
+ if(typeof r9SignHalos!=="undefined") for(var si=0;si<r9SignHalos.length;si++) r9SignHalos[si].opacity=.26; /* senja */
+ if(typeof SHOPS!=="undefined") SHOPS.forEach(function(s){ if(s.marker) s.marker.rotation.y=0.7; });
+ if(typeof pickups!=="undefined") pickups.forEach(function(p){ p.mesh.rotation.y=0.4; p.mesh.position.y=0.15; });
+ if(typeof smokePool!=="undefined") smokePool.forEach(function(p){ p.life=0; p.s.visible=false; p.s.material.opacity=0; });
+ if(typeof tlights!=="undefined") tlights.forEach(function(t){ var gv=t.axis==="v"; t.r.material.color.setHex(gv?0x551111:0xff2222); t.gr.material.color.setHex(gv?0x22ff66:0x0d3316); });
+ if(typeof police!=="undefined") police.forEach(function(pc){ if(pc.userData.bar) pc.userData.bar.material.color.setHex(0xff2222); });
+ if(typeof roadblocks!=="undefined") roadblocks.forEach(function(rb){ if(rb.userData&&rb.userData.bar) rb.userData.bar.material.color.setHex(0xff2222); });
+ /* Roda SEMUA mobil kembali ke sudut 0 — putaran roda selama frame menu
+    bergantung pada jumlah frame sebelum staging (tidak deterministik). */
+ if(typeof cars!=="undefined") cars.forEach(function(c){ if(c.userData.wheels) c.userData.wheels.forEach(function(w){ w.rotation.x=0; }); });
+ if(typeof police!=="undefined") police.forEach(function(pc){ if(pc.userData.wheels) pc.userData.wheels.forEach(function(w){ w.rotation.x=0; }); });
+ if(typeof roadblocks!=="undefined") roadblocks.forEach(function(rb){ if(rb.userData&&rb.userData.wheels) rb.userData.wheels.forEach(function(w){ w.rotation.x=0; }); });
+ /* Lalu lintas: baseline di jalan-jalan kota, lalu timpa dengan posisi
+    per-shot bila ada. Mobil pemain & mobil parkir tidak disentuh. */
+ if(typeof cars!=="undefined"){
+  var mi=0;
+  cars.forEach(function(c){
+   if(c===inCar||c.userData.parked||c.userData.burnt) return;
+   var road=ROADS[mi%5], along=-90+((mi*37)%180), horiz=mi%2===0;
+   c.position.set(horiz?along:road,0,horiz?road:along);
+   c.userData.angle=horiz?(mi%4<2?Math.PI/2:-Math.PI/2):(mi%4<2?0:Math.PI);
+   c.rotation.y=c.userData.angle; mi++;
+  });
+  if(sc.traffic){
+   var mv=cars.filter(function(c){ return c!==inCar&&!c.userData.parked&&!c.userData.burnt; });
+   sc.traffic.forEach(function(t,i){ var c=mv[i]; if(!c) return; c.position.set(t.x,0,t.z); c.userData.angle=t.a; c.rotation.y=t.a; });
+  }
+  /* Mobil gosong (chaos): mobil parkir lain dibalik hitam & berasap. */
+  if(sc.burntCar){
+   var bc=null;
+   cars.forEach(function(c){ if(!bc&&c.userData.parked&&c!==inCar&&!c.userData.burnt) bc=c; });
+   if(bc){
+    bc.position.set(sc.burntCar.x,0,sc.burntCar.z); bc.userData.angle=sc.burntCar.angle; bc.rotation.y=sc.burntCar.angle;
+    bc.userData.hp=0; bc.userData.burnt=true; bc.userData.burnT=14;
+    if(bc.userData.bodyMat) bc.userData.bodyMat.color.setHex(0x17181c);
+    smokePool.forEach(function(p,i){ if(i>2) return; p.life=999; p.max=999; p.s.visible=true; p.s.material.color.setHex(0x2b2b2b); p.s.material.opacity=.4; p.s.position.set(sc.burntCar.x-1+i*1.1,1.6+i*0.9,sc.burntCar.z); var s2=2+i*0.8; p.s.scale.set(s2,s2,1); });
+   }
+  }
+ }
+ /* Pejalan kaki: baseline trotoar, lalu timpa dengan posisi per-shot. */
+ if(typeof peds!=="undefined") peds.forEach(function(p,i){
+  var px2=-88+(i%13)*15, pz2=(i<13)?80.5:63.5;
+  if(sc.peds&&sc.peds[i]){ px2=sc.peds[i].x; pz2=sc.peds[i].z; }
+  p.position.set(px2,0,pz2); p.rotation.y=(i%2?Math.PI/2:-Math.PI/2);
+  p.userData.fleeT=0; p.userData.deadT=0; p.userData.hasTarget=false;
+  p.userData.walk=i*0.9; p.userData.gait=1; poseWalk(p,1);
+ });
+ /* Polisi darat: posisi per-shot (mengejar dari belakang / flank). */
+ if(sc.policeOffsets&&typeof police!=="undefined"){
+  var ppx=inCar?inCar.position.x:player.position.x, ppz=inCar?inCar.position.z:player.position.z;
+  police.forEach(function(pc,i){
+   var o=sc.policeOffsets[i%sc.policeOffsets.length];
+   pc.position.set(ppx+o[0],0,ppz+o[1]); pc.visible=true;
+   pc.userData.angle=sc.car?sc.car.angle:Math.atan2(ppx-pc.position.x,ppz-pc.position.z);
+   pc.rotation.y=pc.userData.angle;
+   if(pc.userData.bar) pc.userData.bar.material.color.setHex(i%2?0x2266ff:0xff2222); /* strobo beku: selang-seling merah/biru */
+  });
+ }
+ /* Roadblock di depan pemain (wanted 4) + heli polisi di depan-atas. */
+ if(sc.wanted>=4){
+  if(typeof placeRoadblock==="function") placeRoadblock();
+  /* Roadblock: dua mobil hitam diputar menyilang (±0,6 rad) supaya terbaca
+     sebagai barikade, bukan lalu lintas searah — strobo merah/biru menyala. */
+  if(typeof roadblocks!=="undefined") roadblocks.forEach(function(rb,i){ rb.rotation.y=Math.PI/2+(i?-.6:.6); rb.userData.angle=rb.rotation.y; if(rb.userData.bar) rb.userData.bar.material.color.setHex(i?0x2266ff:0xff2222); });
+  if(typeof policeHeli!=="undefined"&&policeHeli.g){
+   var vx=-Math.sin(camYaw), vz=-Math.cos(camYaw);
+   var hx=(inCar?inCar.position.x:player.position.x)+vx*(sc.heliAhead||20);
+   var hz=(inCar?inCar.position.z:player.position.z)+vz*(sc.heliAhead||20);
+   hx+=(-vz)*(sc.heliSide||0); hz+=(vx)*(sc.heliSide||0); /* geser heli ke samping supaya sorot tidak menutupi mobil & roadblock */
+   polHeliOn=true; policeHeli.g.visible=true; policeHeli.g.position.set(hx,sc.heliH||17,hz);
+   policeHeli.g.rotation.y=Math.atan2(vx,vz);
+   policeHeli.rotor.rotation.y=0.7; policeHeli.cone.material.opacity=.3;
+   if(policeHeli.tr) policeHeli.tr.rotation.x=0.7;
+   policeHeli.cone.scale.x=0.75; policeHeli.cone.scale.z=0.75; /* kerucut sorot lebih lebar + terang supaya terbaca */
+   var chH=sc.heliH||17; policeHeli.cone.scale.y=chH/36; policeHeli.cone.position.y=-chH/2-1; /* kerucut pas setinggi heli — ujungnya menyentuh jalan */
+   if(policeHeli.bl) policeHeli.bl.visible=true;
+   spotDisc.visible=true; spotDisc.position.set(hx,.08,hz); spotDisc.material.opacity=.3;
+  }
+ }
+ /* Polisi jalan kaki per-shot + pose beku. */
+ if(sc.footCops&&typeof footCops!=="undefined") sc.footCops.forEach(function(f,i){
+  var fc=footCops[i]; if(!fc) return;
+  fc.active=true; fc.mesh.visible=true; fc.mesh.position.set(f.x,0,f.z);
+  fc.mesh.rotation.y=Math.atan2(player.position.x-f.x,player.position.z-f.z);
+  fc.mesh.userData.walk=i*1.1; fc.mesh.userData.gait=1; poseWalk(fc.mesh,1);
+ });
+ /* Kru Azura + pemain jalan kaki: pose napas beku (tidak bergantung jam). */
+ if(typeof azura!=="undefined") azura.forEach(function(e){ if(e.alive&&e.mesh) idlePose(e.mesh,1000); });
+ if(typeof warnSprite!=="undefined"&&warnSprite) warnSprite.visible=false;
+ if(!inCar){ player.position.y=0; player.userData.gait=0; idlePose(player,1000); }
+}
+
 function r9ApplyShot(name){
  var sc=r9ShotScene(name); if(!sc) return false;
  startGame(false);
  /* NEW GAME memunculkan tutorial misi 1 — tutup supaya shot tidak
     tertutup kartu tutorial dan game tidak tertahan di pause. */
  try{ endTutorial(); closeModals(); }catch(e){}
+ shotDispatch=null; shotDispatchFoot=null; shotArmor=null; shotClockTxt=null;
+ document.body.classList.add("shot-mode");
  if(typeof sc.mission==="number"){ missionIdx=sc.mission; setMission(); }
  if(typeof sc.clock==="number") clockT=sc.clock;
+ if(typeof sc.clockTxt==="string"){ shotClockTxt=sc.clockTxt; document.getElementById("clock").textContent=sc.clockTxt; }
  if(typeof sc.money==="number") money=sc.money;
  if(typeof sc.wanted==="number") wanted=sc.wanted;
+ if(typeof sc.health==="number") health=sc.health;
+ if(typeof sc.rp==="number") shotRP=sc.rp; /* R14: RP tampilan per-shot */
+ if(typeof sc.armor==="number") shotArmor=sc.armor;
+ if(typeof sc.radioIdx==="number") radioIdx=sc.radioIdx;
  if(sc.player){ player.position.set(sc.player.x,0,sc.player.z); playerAngle=0; player.rotation.y=0; }
  if(typeof sc.camYaw==="number") camYaw=sc.camYaw;
  if(typeof sc.camPitch==="number") camPitch=sc.camPitch;
- if(typeof sc.camZoom==="number") camZoom=sc.camZoom; /* R14: zoom kamera per-shot (chase lebih dekat) */
- if(typeof sc.rp==="number") shotRP=sc.rp; /* R14: RP tampilan per-shot */
+ if(typeof sc.camZoom==="number") camZoom=sc.camZoom; /* R14: zoom kamera per-shot */
+ snapCamSmooth();
+ /* Header misi kanonik: kicker + stage + judul besar + bar + NEXT. */
+ if(sc.missionHead){
+  var mh=sc.missionHead;
+  var kb=document.querySelector("#missionBox b"); if(kb) kb.textContent=mh.kicker;
+  var ms=document.getElementById("missionStage"); ms.textContent=mh.stage+"  ·  "+mh.progress+"%"; ms.style.display="";
+  var mt=document.getElementById("missionTitle"); mt.textContent=mh.title; mt.style.display="";
+  document.getElementById("missionBarFill").style.width=mh.progress+"%";
+  document.getElementById("missionBarWrap").style.display="";
+  var mn=document.getElementById("missionNext"); mn.textContent="NEXT: "+mh.next; mn.style.display="";
+ }
+ if(sc.district){
+  document.getElementById("districtName").textContent=sc.district.name;
+  document.getElementById("districtStreet").textContent=sc.district.street;
+  document.getElementById("districtLabel").style.display="";
+ }
+ if(sc.dispatch){
+  shotDispatch=sc.dispatch; shotDispatchFoot=sc.dispatchFoot||null;
+  var dh=document.querySelector("#dispatchHead span"); if(dh) dh.textContent="🚔 SBPD RESPONSE";
+ }
+ if(sc.crew){
+  var cp=document.getElementById("crewPanel"), ch="";
+  sc.crew.forEach(function(c){ ch+='<div class="crewRow"><div class="crewAv">👤</div><div class="crewMid"><div class="crewAb">'+c.ability+'</div><div class="crewWho">'+c.name+' · '+c.role+'</div></div><div class="crewKey">'+c.key+'</div><div class="crewReady">READY</div></div>'; });
+  cp.innerHTML=ch; cp.style.display="";
+ }
+ if(sc.toast){ var et=document.getElementById("eventToast"); et.textContent=sc.toast; et.style.display=""; }
  if(sc.dialogue) showShotDialog(sc.dialogue); /* R14: dialog staged-shot (portrait + teks), tanpa pause */
+ /* Senjata: Pistol + SMG dimiliki dengan amunisi staged, Shotgun LOCKED. */
+ if(sc.ammo){ for(var ak in sc.ammo) ammo[ak]=sc.ammo[ak]; ownedWeapons[1]=true; ownedWeapons[2]=true; ownedWeapons[3]=true; ownedWeapons[4]=false; }
  if(sc.weapon){
   var wi=weapons.indexOf(sc.weapon);
-  if(wi>=0){ ownedWeapons[wi]=true; if(isGun(sc.weapon)) ammo[sc.weapon]=sc.ammo||12; weaponIdx=wi; refreshWeaponUI(); }
+  if(wi>=0){ ownedWeapons[wi]=true; weaponIdx=wi; refreshWeaponUI(); }
  }
  if(!sc.onFoot&&sc.car){
   var car=null;
-  /* R14: mobil staged harus CERAH (merah/oranye/kuning/pink) seperti entri top-5 — mobil parkir
-     pertama (hijau gelap) terlihat seperti van dan tenggelam di senja. */
+  /* Mobil staged harus CERAH (merah/oranye/kuning/pink) seperti entri top-10. */
   var BRIGHT=[0xe53935,0xfb8c00,0xfdd835,0xec407a];
   for(var bi=0;bi<BRIGHT.length&&!car;bi++){ for(var i2=0;i2<cars.length;i2++){ if(cars[i2].userData.parked&&!cars[i2].userData.burnt&&cars[i2].userData.origColor===BRIGHT[bi]){ car=cars[i2]; break; } } }
   if(!car){ for(var i=0;i<cars.length;i++){ if(cars[i].userData.parked&&!cars[i].userData.burnt){ car=cars[i]; break; } } }
@@ -2113,38 +2304,68 @@ function r9ApplyShot(name){
    car.position.set(sc.car.x,0,sc.car.z);
    car.userData.angle=sc.car.angle; car.rotation.y=sc.car.angle;
    car.userData.parked=false;
+   if(typeof sc.car.hp==="number") car.userData.hp=sc.car.hp; /* kondisi rusak tampil DENTED */
    inCar=car; carSpeed=sc.car.speed||0;
    if(typeof sc.car.speed==="number") shotSpeed=sc.car.speed; /* R14: speedometer shot membaca kecepatan staged */
    player.visible=false; player.position.copy(car.position);
    updateAB();
   }
  }
- if(sc.wanted>=1&&typeof police!=="undefined"){
-  /* Parkir 3 mobil patroli di sekitar pemain supaya kejar-kejaran
-     langsung terlihat; updatePoliceActive yang mengemudikan mereka. */
-  var px=inCar?inCar.position.x:player.position.x, pz=inCar?inCar.position.z:player.position.z;
-  var offs=[[-14,20],[14,22],[0,30]]; /* R14: ketiganya di DEPAN pemain (flank kiri/kanan + jauh depan) — parkir terlalu dekat bikin mereka menabrak & menumpuk di atas mobil pemain sebelum screenshot */
-  police.forEach(function(pc,i){
-   var o=offs[i%offs.length];
-   pc.position.set(px+o[0],0,pz+o[1]);
-   pc.userData.angle=Math.atan2(px-pc.position.x,pz-pc.position.z);
-   pc.rotation.y=pc.userData.angle;
-  });
- }
- if(sc.onFoot&&typeof missions!=="undefined"&&missions[missionIdx]&&!sc.noFace){
+ /* Kru Azura muncul untuk adegan on-foot (setMission tidak memanggilnya). */
+ if(sc.onFoot&&missionIdx===4&&typeof spawnAzura==="function"&&azura.length===0) spawnAzura();
+ if(sc.onFoot&&typeof missions!=="undefined"&&missions[missionIdx]){
   /* Jalan kaki: hadapkan pemain ke penanda misi dan letakkan kamera di
      belakangnya, supaya target + penanda merah masuk bingkai. */
   var mm=missions[missionIdx];
   var fa=Math.atan2(mm.x-player.position.x,mm.z-player.position.z);
   player.rotation.y=fa; playerAngle=fa; camYaw=fa+Math.PI;
- } else if(sc.noFace){
-  /* SPEC 12:51: hadapkan pemain SEARAH kamera (membelakangi kamera, menghadap
-     jalan utama di depan) — bukan ke penanda misi. */
-  player.rotation.y=camYaw+Math.PI; playerAngle=camYaw+Math.PI;
  }
- if(sc.message) centerMsg(sc.message);
- updateHUD();
+ /* Bekukan dunia DULU supaya drawMap + panel memakai "now" beku. */
+ shotFrozenNow=1000; shotFrozen=true;
+ r15SnapWorld(sc);
+ updateHUD(); updateHUDPanels();
+ var mmc=document.getElementById("minimap");
+ if(mmc){ mmc.width=220; mmc.height=220; drawMap(mmc,.82); }
+ if(sc.sysScreen){ r15FillSysScreen(sc); document.body.classList.add("sys-mode"); }
  r9SnapCamera();
+ clearToasts(); /* pesan tengah + toast radio dari startGame (timer 2–2,2 dtk) harus mati SEKARANG — kalau tidak, screenshot di perbatasan timer bisa menangkapnya di satu run dan tidak di run lain */
+ window.__shotReady=true;
+ return true;
+}
+
+function r15FillSysScreen(sc){
+ var d=sc.sysData||{};
+ var el=function(id){ return document.getElementById(id); };
+ drawMap(el("sysMap"),1.9);
+ var g=el("sysMap").getContext("2d");
+ g.fillStyle="#fff"; g.font="bold 15px sans-serif";
+ g.fillText("MARINA",40,50); g.fillText("BUKIT HALCYON",430,50);
+ g.fillText("PELABUHAN",40,600); g.fillText("NEON STRIP",450,600); g.fillText("TAMAN SENJA",270,300);
+ var sh="";
+ (d.stats||[]).forEach(function(s){ sh+='<div class="sysStat"><div class="k">'+s[0]+'</div><div class="v">'+s[1]+'</div></div>'; });
+ sh+='<div class="sysStat"><div class="k">STORY</div><div class="v">'+(d.story||"")+'</div></div>';
+ sh+='<div class="sysStat"><div class="k">COMPLETE</div><div class="v">'+(d.complete||0)+'%</div></div>';
+ el("sysStats").innerHTML=sh;
+ el("sysSave").textContent="💾 "+(d.save||"")+"  ·  $"+Number(money).toLocaleString("en-US")+"  ·  "+(d.rank||"");
+ var dh="";
+ (d.districts||[]).forEach(function(x){ dh+='<div class="sysRow"><span>'+x[0]+'</span><span class="sysStand '+x[1]+'">'+x[1]+'</span></div>'; });
+ el("sysDistricts").innerHTML=dh;
+ el("sysGarage").innerHTML='<div class="sysRow"><span>🚗 '+(d.garage||"")+'</span><span class="pr">3 OWNED</span></div>';
+ var th="";
+ (d.tune||[]).forEach(function(t){ th+='<div class="sysRow"><span>'+t[0]+'</span><span class="pr">'+t[1]+'</span></div>'; });
+ el("sysTune").innerHTML=th;
+ el("sysScreen").style.display="flex"; /* inline display:none harus ditimpa langsung — class saja kalah */
+ el("sysScreen").classList.add("on");
+}
+
+function r9ApplyTitleShot(){
+ var sc=r9ShotScene("title"); if(!sc) return false;
+ if(typeof sc.clock==="number") clockT=sc.clock;
+ document.getElementById("continueNote").textContent="SAVE SLOT 1 · 61% COMPLETE";
+ var cb=document.getElementById("btnContinue"); if(cb) cb.classList.remove("disabled");
+ r15SnapWorld(null);
+ shotFrozenNow=1000; shotFrozen=true;
+ window.__shotReady=true;
  return true;
 }
 
@@ -2154,6 +2375,7 @@ function r9Tick(){
  var now=performance.now();
  var dt=Math.min(.1,(now-r9LastTick)/1000||0);
  r9LastTick=now;
+ if(typeof shotFrozen!=="undefined"&&shotFrozen) return; /* R15: dunia beku — tidak ada update ambient lagi */
  if(!photoOn){
   r9UpdateTaxi(dt,now);
   r9UpdateGulls(dt,now);
@@ -2166,7 +2388,7 @@ function r9Tick(){
  if(!r9ShotApplied&&r9ShotName){
   if(typeof boot!=="undefined"&&boot.done&&!gameStarted){
    r9ShotApplied=true;
-   try{ r9ApplyShot(r9ShotName); }catch(e){ if(window.console&&console.error) console.error("[r9-shot] staging gagal:",(e&&e.message)||e); }
+   try{ if(r9ShotName==="title") r9ApplyTitleShot(); else r9ApplyShot(r9ShotName); }catch(e){ if(window.console&&console.error) console.error("[r9-shot] staging gagal:",(e&&e.message)||e); }
   }
  }
 }

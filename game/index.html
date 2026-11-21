@@ -245,15 +245,18 @@ select,input[type=range]{accent-color:#ff2e88}
 <!-- HUD -->
 <div id="hud">
   <div class="hudTop">
-    <div class="pillRow"><span class="pill">💰 $<span id="money">250</span></span><span class="pill">❤️ <span id="health">100</span>%</span><span class="pill">🔫 <span id="weapon">Fists</span></span><span class="pill">💊 <span id="medkitN">0</span></span><span class="pill" id="carPill" style="display:none">🚗 <span id="carHp">100</span>% ⛽ <span id="carFuel">100</span>%</span><span class="pill" id="clock">17:40</span><span class="pill" id="radioPill">♪ SEJA FM</span></div>
+    <div class="pillRow"><span class="pill" id="moneyPill">💰 $<span id="money">250</span></span><span class="pill">❤️ <span id="health">100</span>%</span><span class="pill">🔫 <span id="weapon">Fists</span></span><span class="pill">💊 <span id="medkitN">0</span></span><span class="pill" id="carPill" style="display:none">🚗 <span id="carHp">100</span>% ⛽ <span id="carFuel">100</span>%</span><span class="pill" id="clock">17:40</span><span class="pill" id="radioPill">♪ SEJA FM</span></div>
     <div id="rankWrap" style="display:none"><div id="rankName">RANK 1 · ROOKIE</div><div id="rankBar"><div id="rankFill"></div></div><div id="rankRp">0 / 1,000 RP</div></div>
     <div id="wantedWrap"><span id="wantedLabel" style="display:none">WANTED</span><div id="stars">☆☆☆☆☆</div></div>
   </div>
   <div id="weaponSlots" style="display:none"></div>
+  <div id="crewPanel" style="display:none"></div>
   <div class="hudMid">
-    <div id="missionBox"><b>CH. 1 — WARM WELCOME</b><br><span id="missionText">Go to the harbour — the package is on the pavement in front of the blue building near the docks. Walk up to it or press B near it to pick it up.</span><div id="storyLine">📖 STORY 0/5 • 🎯 Side: 0</div><div id="missionTimer"></div><div id="missionHint"></div><div id="sideInfo"></div></div>
+    <div id="missionBox"><b>CH. 1 — WARM WELCOME</b><br><span id="missionText">Go to the harbour — the package is on the pavement in front of the blue building near the docks. Walk up to it or press B near it to pick it up.</span><div id="missionStage" style="display:none"></div><div id="missionTitle" style="display:none"></div><div id="missionBarWrap" style="display:none"><div id="missionBarFill"></div></div><div id="missionNext" style="display:none"></div><div id="storyLine">📖 STORY 0/5 • 🎯 Side: 0</div><div id="missionTimer"></div><div id="missionHint"></div><div id="sideInfo"></div></div>
     <div class="hudRail">
+      <div id="districtLabel" style="display:none"><div id="districtName">PALMERA STRAND</div><div id="districtStreet">Beach Avenue</div></div>
       <div id="minimapWrap"><canvas id="minimap" width="184" height="184"></canvas></div>
+      <div id="vitals" style="display:none"><div class="vrow"><span>HEALTH</span><div class="vbar"><div id="vHealthFill"></div></div><b id="vHealthPct">100</b></div><div class="vrow"><span>ARMOR</span><div class="vbar"><div id="vArmorFill"></div></div><b id="vArmorPct">55</b></div></div>
       <div class="railBtns"><button id="btnPause" aria-label="Pause">⏸️</button><button id="btnMapTop" aria-label="Peta">🗺️</button></div>
       <div class="railBtns"><button id="btnSideTop" aria-label="Misi Sampingan" style="display:none">🎯</button></div>
     </div>
@@ -261,6 +264,21 @@ select,input[type=range]{accent-color:#ff2e88}
   <div id="dispatchPanel" style="display:none"><div id="dispatchHead"><span>🚔 POLICE RESPONSE</span><span id="dispatchCount">0 UNITS</span></div><div id="dispatchRows"></div><div id="dispatchFoot">IN SIGHT</div></div>
   <div id="speedCluster" style="display:none"><div id="speedNum"><span id="speedVal">0</span><span id="speedUnit"> KM/H</span></div><div id="carNameLine"><span id="carName">SEJA GT</span><span id="carCond">CONDITION 100%</span></div><div id="carCondBar"><div id="carCondFill"></div></div><div id="radioLine">♪ SEJA FM — Funk 98.1</div></div>
   <div id="centerMsg"></div><div id="radioToast">📻 SEJA FM</div>
+  <div id="eventToast" style="display:none"></div>
+</div>
+<!-- ROUND 15 — SYSTEM SCREEN: full map + career stats + save slot + garage (staged shot 3). -->
+<div id="sysScreen" style="display:none">
+  <div class="sysMapCol"><h2>MAP — KOTA SEJA</h2><canvas id="sysMap" width="640" height="640"></canvas><div class="sysMapLegend">🔴 Mission &nbsp; 🔵 You &nbsp; 💲 Shop &nbsp; 🔧 Workshop &nbsp; ⛽ Gas &nbsp; 🟦 Police &nbsp; Districts: Pelabuhan (SW) • Neon Strip (SE) • Marina (NW) • Bukit Halcyon (NE)</div></div>
+  <div class="sysRightCol">
+    <h2>CAREER</h2>
+    <div id="sysStats"></div>
+    <div id="sysSave"></div>
+    <h2>DISTRICT STANDING</h2>
+    <div id="sysDistricts"></div>
+    <h2>GARAGE — SPRAY &amp; TUNE</h2>
+    <div id="sysGarage"></div>
+    <div id="sysTune"></div>
+  </div>
 </div>
 
 <div id="shotDialog"><div id="shotAvatar">👮</div><div id="shotBody"><div id="shotName">CAPT. VANCE · DISPATCH</div><div id="shotText">…</div></div></div>
@@ -380,6 +398,91 @@ body.photo #photoBar{display:flex}
  #speedCluster{bottom:calc(315px + var(--sab))}
  #speedNum{font-size:42px}
 }
+</style>
+<!-- Round 15 additions: canonical top-10 HUD for staged shots (desktop, no touch UI). -->
+<style>
+/* R15 SHOT MODE: semua kontrol sentuh & panel non-shot disembunyikan; HUD
+   dirapikan ke pola kanonik (uang besar, minimap besar kiri-bawah, dll).
+   Mode ini HANYA aktif saat ?shot= — main normal tidak berubah. */
+body.shot-mode #touch{display:none!important}
+body.shot-mode #dialogBox,body.shot-mode #tutCard,body.shot-mode #perfBanner,body.shot-mode #dbgChip,body.shot-mode #verTag{display:none!important}
+body.shot-mode .pillRow .pill:not(#moneyPill):not(#clock){display:none}
+body.shot-mode #moneyPill{font-size:34px;padding:8px 16px;background:rgba(10,6,24,.8);border-color:rgba(255,209,102,.6)}
+body.shot-mode #clock{font-size:15px;padding:8px 12px}
+body.shot-mode #stars{font-size:30px;letter-spacing:3px}
+body.shot-mode #wantedLabel{font-size:13px}
+body.shot-mode #rankName{font-size:15px}
+body.shot-mode #rankBar{width:150px;height:7px}
+body.shot-mode #rankRp{font-size:11px}
+body.shot-mode #missionBox{max-width:470px;padding:6px 10px}
+body.shot-mode #missionText,body.shot-mode #missionHint,body.shot-mode #sideInfo,body.shot-mode #taxiInfo{display:none!important}
+#missionStage{font-size:12px;font-weight:900;letter-spacing:.14em;color:#ffd166;margin-top:2px}
+#missionTitle{font-family:"Bebas Neue","Arial Narrow",Impact,sans-serif;font-size:26px;line-height:1;letter-spacing:.05em;color:#fff;margin:2px 0 4px}
+#missionBarWrap{height:6px;background:rgba(255,255,255,.22);border-radius:99px;overflow:hidden;margin:2px 0 5px}
+#missionBarFill{height:100%;background:#ffd166;border-radius:99px}
+#missionNext{font-size:12.5px;font-weight:800;color:#cfe6ff}
+body.shot-mode #missionStage,body.shot-mode #missionTitle,body.shot-mode #missionBarWrap,body.shot-mode #missionNext{display:block!important}
+body.shot-mode #dispatchPanel{width:360px;font-size:11.5px;margin-top:12px;padding:6px 10px}
+body.shot-mode .drow{padding:0}
+body.shot-mode #dispatchHead{margin-bottom:3px}
+body.shot-mode #dispatchFoot{margin-top:3px}
+.dchip.MARKSMAN{background:#7b2ff7;color:#fff}.dchip.SEARCHING{background:#00b8a9;color:#fff}
+body.shot-mode .hudRail{position:fixed;left:12px;bottom:12px;z-index:18;align-items:flex-start}
+body.shot-mode .hudRail .railBtns{display:none}
+body.shot-mode #minimapWrap{width:220px;height:220px;border-width:3px}
+#districtLabel{text-align:left;margin-bottom:4px;text-shadow:0 2px 10px rgba(0,0,0,.8)}
+#districtName{font-family:"Bebas Neue","Arial Narrow",Impact,sans-serif;font-size:20px;line-height:1;letter-spacing:.06em;color:#ffd166}
+#districtStreet{font-size:13px;font-weight:800;color:#fff}
+body.shot-mode #districtLabel{display:block!important}
+#vitals{width:230px;margin-top:8px}
+.vrow{display:flex;align-items:center;gap:6px;margin-top:2px;font-size:10.5px;font-weight:900;letter-spacing:.1em;text-shadow:0 1px 6px rgba(0,0,0,.8)}
+.vrow span{width:52px;color:#fff}
+.vbar{flex:1;height:8px;background:rgba(255,255,255,.22);border-radius:99px;overflow:hidden}
+.vbar div{height:100%;border-radius:99px}
+#vHealthFill{background:#7ef0c1;width:100%}
+#vArmorFill{background:#4da3ff;width:55%}
+.vrow b{width:26px;text-align:right;color:#fff}
+body.shot-mode #vitals{display:block!important}
+body.shot-mode #weaponSlots .wslot{width:62px;padding:7px 2px 6px}
+body.shot-mode #weaponSlots .wico{font-size:22px}
+body.shot-mode #weaponSlots .wname{font-size:10px}
+body.shot-mode #weaponSlots .wammo{font-size:10.5px}
+#crewPanel{position:fixed;right:12px;top:168px;width:250px;z-index:15;display:flex;flex-direction:column;gap:7px}
+.crewRow{display:flex;align-items:center;gap:8px;background:rgba(10,6,24,.85);border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:7px 9px}
+.crewAv{flex:0 0 auto;width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,#4361ee,#7b2ff7);display:flex;align-items:center;justify-content:center;font-size:18px}
+.crewMid{flex:1;min-width:0}
+.crewAb{font-size:12px;font-weight:900;letter-spacing:.05em;color:#fff}
+.crewWho{font-size:11px;font-weight:700;color:#cfe6ff}
+.crewKey{flex:0 0 auto;width:24px;height:24px;border-radius:6px;border:1px solid rgba(255,209,102,.7);color:#ffd166;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.crewReady{flex:0 0 auto;font-size:9.5px;font-weight:900;letter-spacing:.08em;color:#7ef0c1}
+body.shot-mode #crewPanel{display:flex!important}
+body.shot-mode #speedCluster{bottom:20px;right:16px}
+body.shot-mode #speedNum{font-size:96px}
+body.shot-mode #carNameLine{font-size:15px}
+body.shot-mode #carCondBar{width:230px;height:8px}
+body.shot-mode #radioLine{font-size:13px}
+body.shot-mode #shotDialog{bottom:20px}
+#eventToast{position:fixed;left:50%;transform:translateX(-50%);top:76px;z-index:19;background:rgba(120,20,20,.9);border:1px solid rgba(255,209,102,.7);padding:9px 18px;border-radius:999px;font-weight:800;font-size:13.5px;white-space:nowrap;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+body.shot-mode #eventToast{display:block!important}
+/* R15 SYSTEM SCREEN (shot 3): peta penuh + statistik karir + save + garasi. */
+#sysScreen{position:fixed;inset:0;z-index:26;display:none;background:linear-gradient(135deg,#0d0718 0%,#160a2e 60%,#1d0f38 100%);padding:20px 30px;gap:26px;overflow-y:auto}
+#sysScreen.on{display:flex}
+.sysMapCol{flex:0 0 auto}
+.sysMapCol h2,.sysRightCol h2{font-family:"Bebas Neue","Arial Narrow",Impact,sans-serif;letter-spacing:.08em;font-size:26px;margin:0 0 8px;color:#ffd166}
+#sysMap{width:min(560px,50vw);height:auto;background:#0e2a22;border-radius:12px;border:2px solid rgba(255,255,255,.25)}
+.sysMapLegend{font-size:12px;line-height:1.6;opacity:.85;margin-top:8px;max-width:600px}
+.sysRightCol{flex:1;min-width:280px}
+#sysStats{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px}
+.sysStat{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:7px 11px}
+.sysStat .k{font-size:11px;font-weight:900;letter-spacing:.12em;color:#cfe6ff}
+.sysStat .v{font-size:19px;font-weight:900;color:#fff;margin-top:1px}
+#sysSave{background:rgba(255,209,102,.14);border:1px solid rgba(255,209,102,.6);border-radius:10px;padding:8px 11px;font-weight:900;font-size:13.5px;color:#ffe9a8;margin-bottom:10px}
+.sysRightCol h2{font-size:20px;margin:10px 0 6px}
+.sysRow{display:flex;justify-content:space-between;gap:10px;padding:6px 10px;border:1px solid rgba(255,255,255,.12);border-radius:10px;margin-bottom:5px;background:rgba(255,255,255,.04);font-size:13.5px;font-weight:800}
+.sysRow .pr{color:#ffd166}
+.sysStand{font-size:11px;font-weight:900;letter-spacing:.08em;padding:3px 8px;border-radius:6px}
+.sysStand.FRIENDLY{background:#2e9e4f;color:#fff}.sysStand.NEUTRAL{background:#5a6b7a;color:#fff}.sysStand.WARY{background:#e67e22;color:#fff}
+body.sys-mode #hud,body.sys-mode #shotDialog,body.sys-mode #touch{display:none!important}
 </style>
 <div id="photoBar"><span>📸 MODE FOTO — layar bersih, tekan P / ✕ untuk keluar</span><button id="btnPhotoSnap" type="button">📸 AMBIL FOTO</button><button id="btnPhotoExit" type="button">✕ KELUAR</button></div>
 <script src="vendor/three.min.js"></script>
