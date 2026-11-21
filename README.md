@@ -1,4 +1,6 @@
-[![Kota Seja](https://img.shields.io/badge/game-Kota%20Seja-ff9a3c)](https://github.com/Iqblhkim) [![3D](https://img.shields.io/badge/renderer-software%203D-blue)](https://github.com/Iqblhkim) [![make.fun](https://img.shields.io/badge/make.fun-gta6--01-green)](https://make.fun)
+[![make.fun · gta6-01](https://make.fun/badge/gta6-01.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![rank](https://make.fun/badge/gta6-01/Iqblhkim/gta6-01/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![reward](https://make.fun/badge/gta6-01/Iqblhkim/gta6-01/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 
 # Kota Seja — Golden Hour Pursuit
 
