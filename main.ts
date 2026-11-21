@@ -1,297 +1,217 @@
-// main.ts — the entry program for Kota Seja (make.fun bounty gta6-01).
-//
-// Two jobs, in this order when asked:
-//
-//   1. --capture: play the game headless in desktop Chrome, take the four
-//      deterministic screenshots into screenshots/ (see shots.json). This
-//      is a local step only: it needs Chrome and a browser, which the
-//      grading sandbox does not have, so it never runs there.
-//   2. package (always): copy game/ and screenshots/ into the output
-//      directory and write dossier.json there with the kit's buildDossier
-//      from vendor/makefun-game.ts, byte for byte what the scorer rebuilds.
-//
-// Run it the way the kit shows:
-//
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-//   node main.ts --capture          (local only; then package as above)
-//
-// With no MAKEFUN_OUTPUT_DIR the output directory is /output, the grader's
-// writable directory. Standard library only; Node 22 or newer runs this
-// file as-is, no flags, no build, no install.
-
-import { spawn, type ChildProcess } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import {
-  copyFileSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+// Kota Seja — Golden Hour Pursuit (make.fun gta6-01, entry r19).
+// main.ts: packages game/ + screenshots/ into the output directory and
+// writes dossier.json with buildDossier from vendor/makefun-game.ts.
+// With --capture it first takes the 4 screenshots with headless Chrome
+// over CDP (a minimal WebSocket client, standard library only).
+// Without --capture it packages what is already in screenshots/.
+// Node 22, standard library only. No network beyond localhost.
 import { buildDossier } from './vendor/makefun-game.ts';
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { createServer } from 'node:http';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, copyFileSync, rmSync, statSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createConnection } from 'node:net';
 
-const repoRoot = dirname(fileURLToPath(import.meta.url));
-const gameDir = join(repoRoot, 'game');
-const shotsDir = join(repoRoot, 'screenshots');
-const outDir = resolve(process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
+const ROOT = dirname(fileURLToPath(import.meta.url));
+const OUT = process.env.MAKEFUN_OUTPUT_DIR || '/output';
+const SHOTS = JSON.parse(readFileSync(join(ROOT, 'shots.json'), 'utf8')).shots;
+const CHROME = process.env.CHROME_PATH || join(process.env.HOME || '', '.cache/ms-playwright/chromium-1255/chrome-linux64/chrome');
+const HTTP_PORT = 8130;
+const CDP_PORT = 9333;
 
-const dossierCaps = {
-  text_max_bytes: 163840,
-  screenshots: { max: 4, max_bytes: 262144 },
-  game_max_files: 993,
-  game_max_bytes: 50331648,
-  game_path_max_bytes: 1000,
-};
-
-const shotNames = ['chase', 'onfoot', 'map', 'title'];
-const shotLimitBytes = 262144;
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((done) => setTimeout(done, ms));
-
-const sha256 = (bytes: Buffer | Uint8Array): string =>
-  createHash('sha256').update(bytes).digest('hex');
-
-// ---------------------------------------------------------------- packaging
-
-function copyTree(from: string, to: string): number {
-  // Plain files and directories only: a link is refused rather than followed.
-  let files = 0;
-  mkdirSync(to, { recursive: true });
-  for (const name of readdirSync(from).sort()) {
-    const src = join(from, name);
-    const dst = join(to, name);
-    const st = lstatSync(src);
-    if (st.isSymbolicLink()) throw new Error(`refusing to copy a link: ${src}`);
-    if (st.isDirectory()) {
-      files += copyTree(src, dst);
-    } else if (st.isFile()) {
-      copyFileSync(src, dst);
-      files += 1;
-    } else {
-      throw new Error(`refusing a special file: ${src}`);
-    }
+function copyDir(src, dst) {
+  mkdirSync(dst, { recursive: true });
+  for (const e of readdirSync(src, { withFileTypes: true })) {
+    const s = join(src, e.name), d = join(dst, e.name);
+    if (e.isDirectory()) copyDir(s, d);
+    else if (e.isFile()) copyFileSync(s, d);
+    else throw new Error(`refusing non-file entry: ${s}`);
   }
-  return files;
 }
+function sha256(p) { return createHash('sha256').update(readFileSync(p)).digest('hex'); }
 
-function packageEntry(): void {
-  if (!existsSync(gameDir) || !statSync(gameDir).isDirectory()) {
-    throw new Error(`no game/ directory at ${gameDir}`);
-  }
+function packageEntry() {
+  const shotsDir = join(ROOT, 'screenshots');
   const shots = existsSync(shotsDir)
-    ? readdirSync(shotsDir).filter((n) => /\.(png|jpe?g)$/i.test(n)).sort()
+    ? readdirSync(shotsDir).filter((f) => !f.startsWith('.') && statSync(join(shotsDir, f)).isFile()).sort()
     : [];
   if (shots.length < 3 || shots.length > 4) {
-    throw new Error(`screenshots/ must hold 3 or 4 images, found ${shots.length}`);
+    throw new Error(`screenshots/: holds ${shots.length} images, need 3 or 4 (packageEntry refuses)`);
   }
-  rmSync(outDir, { recursive: true, force: true });
-  const gameFiles = copyTree(gameDir, join(outDir, 'game'));
-  const shotFiles = copyTree(shotsDir, join(outDir, 'screenshots'));
-  const dossier = buildDossier(outDir, dossierCaps);
-  writeFileSync(join(outDir, 'dossier.json'), dossier);
-  console.log(
-    `packaged: game/ ${gameFiles} files, screenshots/ ${shotFiles} files, ` +
-      `dossier.json ${dossier.length} bytes sha256 ${sha256(dossier).slice(0, 16)}…`,
-  );
-  console.log(`output: ${outDir}`);
+  for (const f of shots) {
+    const b = statSync(join(shotsDir, f)).size;
+    if (b > 262144) throw new Error(`screenshots/${f}: ${b} bytes, over the 262144 cap`);
+  }
+  rmSync(OUT, { recursive: true, force: true });
+  mkdirSync(OUT, { recursive: true });
+  copyDir(join(ROOT, 'game'), join(OUT, 'game'));
+  copyDir(shotsDir, join(OUT, 'screenshots'));
+  writeFileSync(join(OUT, 'dossier.json'), buildDossier(OUT, {
+    text_max_bytes: 163840,
+    screenshots: { max: 4, max_bytes: 262144 },
+    game_max_files: 993,
+    game_max_bytes: 50331648,
+  }));
+  console.log(`packaged ${shots.length} screenshots + game/ into ${OUT}`);
+  for (const f of shots) console.log(`  ${f} ${statSync(join(shotsDir, f)).size} B sha256 ${sha256(join(shotsDir, f))}`);
+  console.log(`  dossier.json ${statSync(join(OUT, 'dossier.json')).size} B sha256 ${sha256(join(OUT, 'dossier.json'))}`);
 }
 
-// ------------------------------------------------------------------ capturing
-
-const httpPort = 8130;
-const cdpPort = 9333;
-const chromePath =
-  process.env.CHROME_PATH ??
-  join(homedir(), '.cache', 'ms-playwright', 'chromium-1255', 'chrome-linux64', 'chrome');
-const chromeProfile = join(tmpdir(), 'seja-r16-chrome');
-
-type CdpEvent = { method: string; params?: Record<string, any> };
-
-class Cdp {
-  private ws: WebSocket;
-  private nextId = 0;
-  private waiting = new Map<number, (msg: any) => void>();
-  readonly events: CdpEvent[] = [];
-
-  private constructor(ws: WebSocket) {
-    this.ws = ws;
-    ws.addEventListener('message', (ev) => {
-      const msg = JSON.parse(String(ev.data));
-      if (typeof msg.id === 'number' && this.waiting.has(msg.id)) {
-        this.waiting.get(msg.id)!(msg);
-        this.waiting.delete(msg.id);
-      } else if (typeof msg.method === 'string') {
-        this.events.push(msg as CdpEvent);
+// ---- minimal WebSocket client for Chrome DevTools Protocol ----
+function wsConnect(url) {
+  return new Promise((resolveWs, reject) => {
+    const m = /^ws:\/\/([^:/]+):(\d+)(\/.*)$/.exec(url);
+    if (!m) return reject(new Error(`bad ws url ${url}`));
+    const key = Buffer.from(createHash('sha256').update(String(Date.now())).digest()).toString('base64').slice(0, 24);
+    const sock = createConnection(Number(m[2]), m[1], () => {
+      sock.write(`GET ${m[3]} HTTP/1.1\r\nHost: ${m[1]}:${m[2]}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ${key}\r\nSec-WebSocket-Version: 13\r\n\r\n`);
+    });
+    let buf = Buffer.alloc(0);
+    let handshook = false;
+    const handlers = new Map();
+    let msgId = 0;
+    const events = [];
+    sock.on('data', (chunk) => {
+      buf = Buffer.concat([buf, chunk]);
+      if (!handshook) {
+        const idx = buf.indexOf('\r\n\r\n');
+        if (idx < 0) return;
+        handshook = true; buf = buf.subarray(idx + 4);
+        resolveWs(api);
+        return;
+      }
+      for (;;) {
+        if (buf.length < 2) return;
+        const op = buf[0] & 0x0f;
+        let len = buf[1] & 0x7f, off = 2;
+        if (len === 126) { if (buf.length < 4) return; len = buf.readUInt16BE(2); off = 4; }
+        else if (len === 127) { if (buf.length < 10) return; len = Number(buf.readBigUInt64BE(2)); off = 10; }
+        if (buf.length < off + len) return;
+        const payload = buf.subarray(off, off + len);
+        buf = buf.subarray(off + len);
+        if (op === 9) { // ping -> pong
+          const mask = Buffer.from([0x11, 0x22, 0x33, 0x44]);
+          const head = Buffer.from([0x8a, 0x80 | payload.length]);
+          const masked = Buffer.from(payload.map((b, i) => b ^ mask[i % 4]));
+          sock.write(Buffer.concat([head, mask, masked]));
+          continue;
+        }
+        if (op !== 1) continue;
+        let msg;
+        try { msg = JSON.parse(payload.toString('utf8')); } catch { continue; }
+        if (msg.id !== undefined && handlers.has(msg.id)) {
+          const h = handlers.get(msg.id); handlers.delete(msg.id);
+          if (msg.error) h.reject(new Error(`CDP ${msg.method || ''}: ${JSON.stringify(msg.error)}`));
+          else h.resolve(msg.result);
+        } else if (msg.method) events.push(msg);
       }
     });
-  }
-
-  static async open(url: string): Promise<Cdp> {
-    const ws = new WebSocket(url);
-    await new Promise<void>((done, fail) => {
-      ws.addEventListener('open', () => done());
-      ws.addEventListener('error', () => fail(new Error('CDP websocket failed to open')));
-    });
-    return new Cdp(ws);
-  }
-
-  call(method: string, params: Record<string, unknown> = {}): Promise<any> {
-    const id = ++this.nextId;
-    return new Promise((done, fail) => {
-      const timer = setTimeout(() => fail(new Error(`CDP ${method} timed out`)), 30000);
-      this.waiting.set(id, (msg) => {
-        clearTimeout(timer);
-        if (msg.error) fail(new Error(`CDP ${method}: ${JSON.stringify(msg.error)}`));
-        else done(msg.result ?? {});
+    sock.on('error', reject);
+    function send(method, params = {}) {
+      return new Promise((res, rej) => {
+        const id = ++msgId;
+        handlers.set(id, { resolve: res, reject: rej });
+        const data = Buffer.from(JSON.stringify({ id, method, params }), 'utf8');
+        const mask = Buffer.from([0x11, 0x22, 0x33, 0x44]);
+        let head;
+        if (data.length < 126) head = Buffer.from([0x81, 0x80 | data.length]);
+        else if (data.length < 65536) { head = Buffer.alloc(4); head[0] = 0x81; head[1] = 0xfe; head.writeUInt16BE(data.length, 2); }
+        else { head = Buffer.alloc(10); head[0] = 0x81; head[1] = 0xff; head.writeBigUInt64BE(BigInt(data.length), 2); }
+        const masked = Buffer.from(data.map((b, i) => b ^ mask[i % 4]));
+        sock.write(Buffer.concat([head, mask, masked]));
       });
-      this.ws.send(JSON.stringify({ id, method, params }));
-    });
-  }
-
-  async evaluate(expression: string): Promise<unknown> {
-    const r = await this.call('Runtime.evaluate', {
-      expression,
-      returnByValue: true,
-      awaitPromise: true,
-    });
-    if (r.exceptionDetails) throw new Error(`evaluate failed: ${JSON.stringify(r.exceptionDetails)}`);
-    return r.result?.value;
-  }
-
-  consoleErrors(): string[] {
-    return this.events
-      .filter(
-        (e) =>
-          e.method === 'Runtime.exceptionThrown' ||
-          (e.method === 'Runtime.consoleAPICalled' && e.params?.type === 'error'),
-      )
-      .map((e) => JSON.stringify(e).slice(0, 300));
-  }
-
-  close(): void {
-    this.ws.close();
-  }
-}
-
-async function waitForHttp(url: string, tries = 50): Promise<void> {
-  for (let i = 0; i < tries; i++) {
-    try {
-      const r = await fetch(url);
-      if (r.ok) return;
-    } catch {
-      // not up yet
     }
+    const api = { send, events, close: () => sock.destroy() };
+  });
+}
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+import { get as httpGet } from 'node:http';
+async function httpJson(path, port) {
+  return new Promise((resolveJson, reject) => {
+    httpGet({ host: '127.0.0.1', port, path }, (res) => {
+      let d = '';
+      res.on('data', (c) => { d += c; });
+      res.on('end', () => { try { resolveJson(JSON.parse(d)); } catch (e) { reject(e); } });
+    }).on('error', reject);
+  });
+}
+async function waitFor(pred, timeoutMs, label) {
+  const t0 = Date.now();
+  for (;;) {
+    try { if (await pred()) return; } catch { /* retry */ }
+    if (Date.now() - t0 > timeoutMs) throw new Error(`timeout waiting for ${label}`);
     await sleep(200);
   }
-  throw new Error(`server never answered at ${url}`);
 }
 
-async function waitForCdp(url: string, tries = 50): Promise<string> {
-  for (let i = 0; i < tries; i++) {
-    try {
-      const r = await fetch(url);
-      const info = (await r.json()) as { webSocketDebuggerUrl?: string };
-      if (info.webSocketDebuggerUrl) return info.webSocketDebuggerUrl;
-    } catch {
-      // not up yet
-    }
-    await sleep(200);
-  }
-  throw new Error(`Chrome devtools never answered at ${url}`);
-}
-
-async function captureAll(): Promise<void> {
-  if (!existsSync(chromePath)) throw new Error(`no Chrome at ${chromePath}`);
-  let server: ChildProcess | null = null;
-  let chrome: ChildProcess | null = null;
+async function capture() {
+  const shotsDir = join(ROOT, 'screenshots');
+  mkdirSync(shotsDir, { recursive: true });
+  // 1. Static server for game/.
+  const server = spawn(process.execPath, [join(ROOT, 'serve.ts')], {
+    env: { ...process.env, PORT: String(HTTP_PORT), GAME_DIR: join(ROOT, 'game') },
+    stdio: 'inherit',
+  });
+  let chrome = null;
   try {
-    server = spawn(process.execPath, [join(repoRoot, 'serve.ts'), String(httpPort)], {
-      cwd: repoRoot,
-      stdio: 'ignore',
-    });
-    await waitForHttp(`http://127.0.0.1:${httpPort}/index.html`);
-    chrome = spawn(chromePath, [
-      '--headless=new',
-      '--no-sandbox',
-      '--disable-gpu',
-      `--remote-debugging-port=${cdpPort}`,
-      `--user-data-dir=${chromeProfile}`,
-      'about:blank',
+    await waitFor(async () => {
+      const r = await fetch(`http://127.0.0.1:${HTTP_PORT}/index.html`);
+      return r.ok;
+    }, 10000, 'static server');
+    // 2. Headless Chrome with CDP.
+    chrome = spawn(CHROME, [
+      '--headless=new', '--no-sandbox', '--disable-gpu',
+      `--remote-debugging-port=${CDP_PORT}`,
+      `--window-size=1280,720`, '--hide-scrollbars', 'about:blank',
     ], { stdio: 'ignore' });
-    await waitForCdp(`http://127.0.0.1:${cdpPort}/json/version`);
-    const list = (await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`)).json()) as Array<{
-      type?: string;
-      webSocketDebuggerUrl?: string;
-    }>;
-    const page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl);
-    if (!page?.webSocketDebuggerUrl) throw new Error('no page target in Chrome');
-    const cdp = await Cdp.open(page.webSocketDebuggerUrl);
+    const targets = await new Promise((res, rej) => {
+      const tryList = async () => {
+        try {
+          const list = await httpJson('/json/list', CDP_PORT);
+          if (Array.isArray(list) && list.length) return res(list);
+        } catch { /* not up yet */ }
+        setTimeout(tryList, 300);
+      };
+      setTimeout(() => rej(new Error('chrome CDP never came up')), 20000);
+      tryList();
+    });
+    const page = targets.find((t) => t.type === 'page');
+    if (!page) throw new Error('no page target from chrome');
+    const ws = await wsConnect(page.webSocketDebuggerUrl);
     try {
-      await cdp.call('Runtime.enable');
-      await cdp.call('Page.enable');
-      await cdp.call('Emulation.setDeviceMetricsOverride', {
-        width: 1280,
-        height: 720,
-        deviceScaleFactor: 1,
-        mobile: false,
-      });
-      mkdirSync(shotsDir, { recursive: true });
-      for (let n = 1; n <= 4; n++) {
-        cdp.events.length = 0;
-        await cdp.call('Page.navigate', {
-          url: `http://127.0.0.1:${httpPort}/index.html?shot=${n}`,
-        });
-        let ready = false;
-        for (let i = 0; i < 60; i++) {
-          await sleep(150);
-          try {
-            ready = (await cdp.evaluate('window.__sejaReady === true')) === true;
-          } catch {
-            // page still loading
-          }
-          if (ready) break;
-        }
-        if (!ready) throw new Error(`shot ${n}: __sejaReady never became true`);
+      await ws.send('Page.enable');
+      await ws.send('Runtime.enable');
+      await ws.send('Log.enable');
+      await ws.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+      for (const [i, shotMeta] of SHOTS.entries()) {
+        ws.events.length = 0;
+        await ws.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/index.html?shot=${i + 1}` });
+        await waitFor(async () => {
+          const r = await ws.send('Runtime.evaluate', { expression: 'window.__sejaReady === true', returnByValue: true });
+          return r.result && r.result.value === true;
+        }, 15000, `__sejaReady for shot ${i + 1}`);
         await sleep(400);
-        const problems = cdp.consoleErrors();
-        if (problems.length > 0) {
-          throw new Error(`shot ${n}: console errors:\n${problems.join('\n')}`);
-        }
-        const shot = await cdp.call('Page.captureScreenshot', {
-          format: 'jpeg',
-          quality: 80,
-        });
-        const bytes = Buffer.from(String(shot.data), 'base64');
-        if (bytes.length > shotLimitBytes) {
-          throw new Error(`shot ${n}: ${bytes.length} bytes, over the ${shotLimitBytes} limit`);
-        }
-        const file = join(shotsDir, `${n}-${shotNames[n - 1]}.jpg`);
+        const bad = ws.events.filter((e) =>
+          (e.method === 'Runtime.exceptionThrown') ||
+          (e.method === 'Runtime.consoleAPICalled' && e.params.type === 'error') ||
+          (e.method === 'Log.entryAdded' && e.params.entry.level === 'error'));
+        if (bad.length) throw new Error(`shot ${i + 1}: console/page errors: ${JSON.stringify(bad).slice(0, 600)}`);
+        const shot = await ws.send('Page.captureScreenshot', { format: 'jpeg', quality: 80 });
+        const bytes = Buffer.from(shot.data, 'base64');
+        if (bytes.length > 262144) throw new Error(`shot ${i + 1}: ${bytes.length} bytes, over the 262144 cap`);
+        const file = join(shotsDir, shotMeta.file);
         writeFileSync(file, bytes);
-        console.log(`shot ${n}: ${basename(file)} ${bytes.length} bytes sha256 ${sha256(bytes)}`);
+        console.log(`shot ${i + 1} ${shotMeta.file} ${bytes.length} B sha256 ${createHash('sha256').update(bytes).digest('hex')}`);
       }
-    } finally {
-      cdp.close();
-    }
+    } finally { ws.close(); }
   } finally {
-    chrome?.kill();
-    server?.kill();
+    if (chrome) chrome.kill();
+    server.kill();
   }
 }
 
-// ------------------------------------------------------------------------ run
-
-const capture = process.argv.includes('--capture');
-try {
-  if (capture) await captureAll();
-  packageEntry();
-} catch (err) {
-  console.error(`main.ts: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-}
+const args = process.argv.slice(2);
+if (args.includes('--capture')) await capture();
+packageEntry();

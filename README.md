@@ -1,103 +1,21 @@
-[![make.fun](https://make.fun/badge/gta6-01.svg)](https://make.fun/bounty/gta6-01)
-[![rank](https://make.fun/badge/gta6-01/Iqblhkim/gta6-01/rank.svg)](https://make.fun/bounty/gta6-01)
-[![reward](https://make.fun/badge/gta6-01/Iqblhkim/gta6-01/reward.svg)](https://make.fun/bounty/gta6-01)
+[![Kota Seja](https://img.shields.io/badge/game-Kota%20Seja-ff9a3c)](https://github.com/Iqblhkim) [![3D](https://img.shields.io/badge/renderer-software%203D-blue)](https://github.com/Iqblhkim) [![make.fun](https://img.shields.io/badge/make.fun-gta6--01-green)](https://make.fun)
 
 # Kota Seja — Golden Hour Pursuit
 
-An open-world crime game in the spirit of GTA 6, built for the
-[make.fun GTA 6 bounty](https://make.fun/bounty/gta6-01). One island, four
-districts, eight jobs. Rico Vega owes $50,000 to the Azura syndicate — steal
-cars, outrun the SBPD, and take back Kota Seja before the sun sets for the
-last time.
+An original open-world crime game for make.fun gta6-01: Rico Vega takes back the island city of Kota Seja at golden hour. A hand-written software 3D renderer (perspective projection, painter's algorithm, flat dusk shading — no WebGL, no libraries) draws the beach boulevard, lit towers, palms, traffic, police chases and a searchlight heli. Drive, walk, steal cars, dodge the KSPD, run 12 story missions and side jobs, with a dense HUD, minimap, crew abilities and a full island map.
 
-The game is a plain 2D-canvas game with no build step and no network
-requests: every script, image and sound it needs is a file under `game/`.
-Open `game/index.html` in desktop Chrome and play with keyboard and mouse.
-
-## What is in the game
-
-- **A city to explore** — Palmera Strand, Pelabuhan, Neon Strip, Marina,
-  Bukit Halcyon and Taman Senja, with a beach road, shopfronts, palms,
-  pedestrians and traffic.
-- **Driving and carjacking** — walk up to a car, press E, drive; the camera,
-  speedometer, car condition and radio follow.
-- **Police who respond** — a wanted level from 1 to 5 stars, an SBPD dispatch
-  list with named units and roles, pursuit cars, roadblocks and a helicopter
-  with a spotlight.
-- **Missions and a story** — five story chapters with stages, progress bars
-  and next objectives, plus side jobs, cash, ranks and RP.
-- **Combat and crew** — five weapon slots, three crew abilities on Z/X/V,
-  and the Azura crew to fight on foot.
-- **Systems** — a full map screen with career stats, district standings and
-  a garage, save slots, pause, radio stations and dialogue.
-- **HUD** — cash and clock, mission header, dispatch list, toasts, rank and
-  wanted stars, weapons, crew, district name, round minimap, health and
-  armor, dialogue box and a big speedometer.
-
-## Controls
-
-| Key | Action |
-| --- | --- |
-| WASD / arrows | Walk / drive |
-| E | Enter or exit a car |
-| Space | Attack / fire |
-| 1–5 | Switch weapon |
-| Z / X / V | Crew abilities |
-| M | Map and garage |
-| S | Save game (from map or pause) |
-| P / Esc | Pause |
-
-## Play it
+## Run
 
 ```sh
-node serve.ts
+node serve.ts        # serves game/ at http://127.0.0.1:8130/
 ```
 
-Then open <http://localhost:8080> in desktop Chrome. `serve.ts` is a small
-static server for `game/` only; any static server works the same way.
+Open the page, click or press Enter to play. WASD drive/walk, mouse drag to look, E enter/steal a car, SPACE handbrake, Q/E/R crew abilities, M map, ESC pause. Progress auto-saves. Steal the blue coupe on Palm Row to start the crew missions; speeding with the KSPD on your tail raises your wanted level.
 
-## Screenshots
-
-Four deterministic captures live in `screenshots/` — a beach chase with the
-helicopter, an on-foot fight with the Azura crew, the map and career screen,
-and the title screen. Their staging is described in `shots.json`.
-
-Regenerate them (headless Chrome, deterministic — two runs produce identical
-bytes):
+## Capture + package
 
 ```sh
-node main.ts --capture
+MAKEFUN_OUTPUT_DIR=/tmp/gta-r19-out node main.ts --capture
 ```
 
-## Handing the entry in
-
-`main.ts` is the entry program: it copies `game/` and `screenshots/` into
-the output directory and writes `dossier.json` there with the kit's
-`buildDossier` from `vendor/makefun-game.ts`.
-
-```sh
-mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-```
-
-The output holds exactly `game/`, `screenshots/` and `dossier.json`. The
-dossier is byte for byte what `buildDossier` writes from those two
-directories, so any rebuild of the same files produces the same dossier.
-
-## Layout
-
-```text
-main.ts            entry program: capture (with --capture) + package to output
-serve.ts           static server for game/
-shots.json         metadata for the four screenshots
-game/index.html    page, HUD chrome and screens
-game/src/hint.js   static data: missions, crew, weapons, radio, dialogue
-game/src/shots.js  deterministic staging for ?shot=1..4
-game/src/game.js   renderer, world, HUD, input and live play
-game/vendor/       vendored libraries (three.min.js, unused by this build)
-screenshots/       1-chase.jpg, 2-onfoot.jpg, 3-map.jpg, 4-title.jpg
-vendor/            the kit's makefun-game.ts (unchanged)
-```
-
-## License
-
-MIT — see `LICENSE`.
+Referral: https://make.fun/r/5qd1v7g7
