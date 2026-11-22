@@ -44,8 +44,9 @@ function packageEntry() {
     const b = statSync(join(shotsDir, f)).size;
     if (b > 262144) throw new Error(`screenshots/${f}: ${b} bytes, over the 262144 cap`);
   }
-  rmSync(OUT, { recursive: true, force: true });
+  // OUT may be a bind mount in the grader: never remove OUT itself, only its contents.
   mkdirSync(OUT, { recursive: true });
+  for (const e of readdirSync(OUT)) rmSync(join(OUT, e), { recursive: true, force: true });
   copyDir(join(ROOT, 'game'), join(OUT, 'game'));
   copyDir(shotsDir, join(OUT, 'screenshots'));
   writeFileSync(join(OUT, 'dossier.json'), buildDossier(OUT, {
